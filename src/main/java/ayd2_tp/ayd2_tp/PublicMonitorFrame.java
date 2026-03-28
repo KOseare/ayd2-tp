@@ -33,17 +33,17 @@ public class PublicMonitorFrame extends JFrame {
 
         JPanel historyPanel = new JPanel(new GridLayout(4, 1, 8, 8));
         historyPanel.setBorder(BorderFactory.createTitledBorder("Últimos llamados"));
-        historyPanel.add(mockHistoryRow("11.111.111"));
-        historyPanel.add(mockHistoryRow("22.222.222"));
-        historyPanel.add(mockHistoryRow("33.333.333"));
-        historyPanel.add(mockHistoryRow("44.444.444"));
+        historyPanel.add(historyRow("11.111.111"));
+        historyPanel.add(historyRow("22.222.222"));
+        historyPanel.add(historyRow("33.333.333"));
+        historyPanel.add(historyRow("44.444.444"));
 
         setLayout(new BorderLayout(8, 8));
         add(currentPanel, BorderLayout.CENTER);
         add(historyPanel, BorderLayout.SOUTH);
     }
 
-    private static JLabel mockHistoryRow(String doc) {
+    private static JLabel historyRow(String doc) {
         JLabel row = new JLabel(doc, SwingConstants.CENTER);
         row.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 22));
         row.setOpaque(true);

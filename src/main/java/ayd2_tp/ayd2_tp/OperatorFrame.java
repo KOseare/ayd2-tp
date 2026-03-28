@@ -21,16 +21,14 @@ public class OperatorFrame extends JFrame {
         setSize(420, 280);
         setLocationRelativeTo(null);
 
-        JLabel statusLabel = new JLabel("Estado: listo", SwingConstants.CENTER);
-        JLabel queueHint = new JLabel("Clientes en espera: 5", SwingConstants.CENTER);
+        JLabel queueNumber = new JLabel("Clientes en espera: 5", SwingConstants.CENTER);
         JLabel lastCalled = new JLabel("Último llamado: Test", SwingConstants.CENTER);
 
         JButton callNextButton = new JButton("Llamar siguiente");
 
         JPanel north = new JPanel(new GridLayout(3, 1, 6, 6));
         north.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
-        north.add(statusLabel);
-        north.add(queueHint);
+        north.add(queueNumber);
         north.add(lastCalled);
 
         JPanel south = new JPanel();
