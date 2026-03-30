@@ -2,6 +2,11 @@ package ayd2_tp.ayd2_tp;
 
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -38,5 +43,7 @@ public class OperatorFrame extends JFrame {
         setLayout(new BorderLayout());
         add(north, BorderLayout.CENTER);
         add(south, BorderLayout.SOUTH);
+
     }
+    
 }
