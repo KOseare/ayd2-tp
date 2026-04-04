@@ -4,6 +4,8 @@
 
 ### Variables de entorno
 
+Las variables de entorno no quedan en el .jar. El sistema en el que se ejecute el .jar debe contener dichas variables de entorno. Es decir, debe haber un .env en el mismo directorio desde donde se ejecute la aplicación.
+
 Crear archivo .env en la raíz del proyecto siguiendo el ejemplo de .env.example.
 
 ## Compilar
