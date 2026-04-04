@@ -1,7 +1,11 @@
 package com.grupo6.interfaz_de_operador;
 
 import java.awt.BorderLayout;
-import java.awt.GridLayout;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -23,6 +27,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
 import com.grupo6.environment.Environment;
+import com.grupo6.ui.AppUiTheme;
 
 public class OperatorFrame extends JFrame {
 
@@ -34,38 +39,86 @@ public class OperatorFrame extends JFrame {
   private final Queue<String> waitingQueue = new LinkedList<>();
   private final JLabel queueCountLabel;
   private final JLabel nextInQueueLabel;
-  private final JLabel lastCalledLabel;
+  private final JLabel lastCalledCaption;
+  private final JLabel lastCalledDniLabel;
   private final JLabel statusLabel;
   private ServerSocket serverSocket;
 
   public OperatorFrame() {
     setTitle("Puesto de Operador");
     setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-    setSize(420, 280);
+    setMinimumSize(new Dimension(440, 400));
+    setSize(480, 420);
     setLocationRelativeTo(null);
 
-    queueCountLabel = new JLabel("Clientes en espera: 0", SwingConstants.CENTER);
-    nextInQueueLabel = new JLabel("Proximo en cola: -", SwingConstants.CENTER);
-    lastCalledLabel = new JLabel("Ultimo llamado: -", SwingConstants.CENTER);
-    statusLabel = new JLabel("Estado: esperando clientes", SwingConstants.CENTER);
+    Font base = AppUiTheme.baseUiFont();
+    Font secondaryFont = base.deriveFont(Font.PLAIN, 13f);
+    Font statusFont = base.deriveFont(Font.PLAIN, 12f);
 
-    JButton callNextButton = new JButton("Llamar Siguiente");
+    queueCountLabel = new JLabel("Clientes en espera: 0", SwingConstants.CENTER);
+    queueCountLabel.setFont(secondaryFont);
+    queueCountLabel.setForeground(AppUiTheme.TEXT_MUTED);
+
+    nextInQueueLabel = new JLabel("Próximo en cola: -", SwingConstants.CENTER);
+    nextInQueueLabel.setFont(secondaryFont);
+    nextInQueueLabel.setForeground(AppUiTheme.TEXT_MUTED);
+
+    lastCalledCaption = new JLabel("ÚLTIMO LLAMADO", SwingConstants.CENTER);
+    lastCalledCaption.setFont(base.deriveFont(Font.BOLD, 11f));
+    lastCalledCaption.setForeground(AppUiTheme.TEXT_MUTED);
+
+    lastCalledDniLabel = new JLabel("-", SwingConstants.CENTER);
+    lastCalledDniLabel.setFont(base.deriveFont(Font.BOLD, 44f));
+    lastCalledDniLabel.setForeground(AppUiTheme.TEXT_HERO_DNI);
+    lastCalledDniLabel.setOpaque(false);
+
+    statusLabel = new JLabel("Estado: esperando clientes", SwingConstants.CENTER);
+    statusLabel.setFont(statusFont);
+    statusLabel.setForeground(AppUiTheme.TEXT_BODY);
+
+    JButton callNextButton = new JButton("Llamar siguiente");
+    callNextButton.setFont(base.deriveFont(Font.BOLD, 14f));
+    callNextButton.setMargin(new Insets(12, 28, 12, 28));
     callNextButton.addActionListener(e -> callNextClient());
 
-    JPanel north = new JPanel(new GridLayout(4, 1, 6, 6));
-    north.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
-    north.add(queueCountLabel);
-    north.add(nextInQueueLabel);
-    north.add(lastCalledLabel);
-    north.add(statusLabel);
+    JPanel queueInfoPanel = new JPanel(new GridBagLayout());
+    queueInfoPanel.setOpaque(false);
+    GridBagConstraints gc = new GridBagConstraints();
+    gc.gridx = 0;
+    gc.gridy = 0;
+    gc.weightx = 1;
+    gc.fill = GridBagConstraints.HORIZONTAL;
+    gc.insets = new Insets(0, 0, 4, 0);
+    queueInfoPanel.add(queueCountLabel, gc);
+    gc.gridy = 1;
+    gc.insets = new Insets(0, 0, 0, 0);
+    queueInfoPanel.add(nextInQueueLabel, gc);
 
-    JPanel south = new JPanel();
-    south.setBorder(BorderFactory.createEmptyBorder(0, 16, 16, 16));
-    south.add(callNextButton);
+    JPanel hero = new JPanel(new BorderLayout(0, 10));
+    hero.setBackground(AppUiTheme.BG_HERO);
+    hero.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(AppUiTheme.BORDER_HERO, 2),
+        BorderFactory.createEmptyBorder(20, 24, 28, 24)));
+    hero.add(lastCalledCaption, BorderLayout.NORTH);
+    hero.add(lastCalledDniLabel, BorderLayout.CENTER);
 
-    setLayout(new BorderLayout());
-    add(north, BorderLayout.CENTER);
-    add(south, BorderLayout.SOUTH);
+    JPanel footer = new JPanel(new BorderLayout(0, 12));
+    footer.setOpaque(false);
+    footer.setBorder(BorderFactory.createEmptyBorder(4, 20, 0, 20));
+    footer.add(statusLabel, BorderLayout.NORTH);
+    JPanel buttonRow = new JPanel();
+    buttonRow.setOpaque(false);
+    buttonRow.add(callNextButton);
+    footer.add(buttonRow, BorderLayout.CENTER);
+
+    JPanel root = new JPanel(new BorderLayout(16, 16));
+    root.setBackground(AppUiTheme.BG_APP);
+    root.setBorder(BorderFactory.createEmptyBorder(16, 20, 20, 20));
+    root.add(queueInfoPanel, BorderLayout.NORTH);
+    root.add(hero, BorderLayout.CENTER);
+    root.add(footer, BorderLayout.SOUTH);
+
+    setContentPane(root);
     addWindowListener(new WindowAdapter() {
       @Override
       public void windowClosing(WindowEvent e) {
@@ -109,7 +162,7 @@ public class OperatorFrame extends JFrame {
       writer.println(calledDni);
       SwingUtilities.invokeLater(() -> {
         synchronized (OperatorFrame.this) {
-          lastCalledLabel.setText("Ultimo llamado: " + calledDni);
+          lastCalledDniLabel.setText(calledDni);
           updateQueueLabels();
         }
         statusLabel.setText("Estado: Atencion " + calledDni);
@@ -128,7 +181,7 @@ public class OperatorFrame extends JFrame {
   private synchronized void updateQueueLabels() {
     queueCountLabel.setText("Clientes en espera: " + waitingQueue.size());
     String nextDni = waitingQueue.peek();
-    nextInQueueLabel.setText("Proximo en cola: " + (nextDni == null ? "-" : nextDni));
+    nextInQueueLabel.setText("Próximo en cola: " + (nextDni == null ? "-" : nextDni));
   }
 
   private void startSocketListener() {
