@@ -17,11 +17,13 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.WindowConstants;
 
+import com.grupo6.environment.Environment;
+
 public class RegistrationTerminalFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
-  private static final String OPERATOR_HOST = "127.0.0.1";
-  private static final int OPERATOR_PORT = 3001;
+  private static final String OPERATOR_HOST = Environment.OPERATOR_HOST;
+  private static final int OPERATOR_PORT = Environment.OPERATOR_PORT;
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
   private final JTextField documentField;
@@ -44,7 +46,7 @@ public class RegistrationTerminalFrame extends JFrame {
 
   private void sendData(String dni) {
     try (Socket socket = new Socket(OPERATOR_HOST, OPERATOR_PORT);
-         PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+        PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
       out.println(dni);
       statusLabel.setText("Registro exitoso. DNI enviado: " + dni);
       documentField.setText("");
@@ -56,8 +58,7 @@ public class RegistrationTerminalFrame extends JFrame {
           this,
           "No fue posible enviar el DNI porque la interfaz de operador no responde.\n" + e.getMessage(),
           "Error de conexion",
-          JOptionPane.ERROR_MESSAGE
-      );
+          JOptionPane.ERROR_MESSAGE);
     }
   }
 

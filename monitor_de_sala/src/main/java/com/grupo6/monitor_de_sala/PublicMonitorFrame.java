@@ -24,10 +24,12 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
+import com.grupo6.environment.Environment;
+
 public class PublicMonitorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
-  private static final int MONITOR_PORT = 3002;
+  private static final int MONITOR_PORT = Environment.MONITOR_PORT;
   private static final int HISTORY_LIMIT = 5;
 
   private final JLabel currentTurnLabel;
@@ -104,7 +106,7 @@ public class PublicMonitorFrame extends JFrame {
         serverSocket = localServerSocket;
         while (!Thread.currentThread().isInterrupted()) {
           try (Socket socket = localServerSocket.accept();
-               BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+              BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
             String dni = reader.readLine();
             if (dni == null || dni.trim().isEmpty()) {
               continue;
@@ -113,14 +115,14 @@ public class PublicMonitorFrame extends JFrame {
             SwingUtilities.invokeLater(() -> updateTurn(normalizedDni));
           } catch (IOException clientError) {
             if (!localServerSocket.isClosed()) {
-              SwingUtilities.invokeLater(() ->
-                  statusLabel.setText("Error de red en recepcion: " + clientError.getMessage()));
+              SwingUtilities
+                  .invokeLater(() -> statusLabel.setText("Error de red en recepcion: " + clientError.getMessage()));
             }
           }
         }
       } catch (IOException serverError) {
-        SwingUtilities.invokeLater(() ->
-            statusLabel.setText("No se pudo iniciar servidor: " + serverError.getMessage()));
+        SwingUtilities
+            .invokeLater(() -> statusLabel.setText("No se pudo iniciar servidor: " + serverError.getMessage()));
       }
     }, "monitor-server-listener");
 

@@ -1,3 +1,7 @@
+# Environment
+*Secret.java
+*.env
+
 ### Java ###
 # Compiled class file
 *.class

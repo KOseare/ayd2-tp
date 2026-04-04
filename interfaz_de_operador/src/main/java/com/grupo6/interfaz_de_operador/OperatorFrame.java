@@ -22,12 +22,14 @@ import javax.swing.WindowConstants;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
+import com.grupo6.environment.Environment;
+
 public class OperatorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
-  private static final int OPERATOR_PORT = 3001;
-  private static final String MONITOR_HOST = "127.0.0.1";
-  private static final int MONITOR_PORT = 3002;
+  private static final int OPERATOR_PORT = Environment.OPERATOR_PORT;
+  private static final String MONITOR_HOST = Environment.MONITOR_HOST;
+  private static final int MONITOR_PORT = Environment.MONITOR_PORT;
 
   private final Queue<String> waitingQueue = new LinkedList<>();
   private final JLabel queueCountLabel;
@@ -103,7 +105,7 @@ public class OperatorFrame extends JFrame {
 
   private void sendToMonitor(String calledDni) {
     try (Socket socket = new Socket(MONITOR_HOST, MONITOR_PORT);
-         PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
+        PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
       writer.println(calledDni);
       SwingUtilities.invokeLater(() -> {
         synchronized (OperatorFrame.this) {
@@ -135,7 +137,7 @@ public class OperatorFrame extends JFrame {
         serverSocket = localServerSocket;
         while (!Thread.currentThread().isInterrupted()) {
           try (Socket clientSocket = localServerSocket.accept();
-               BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
+              BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
             String receivedDni = reader.readLine();
             if (receivedDni == null || receivedDni.trim().isEmpty()) {
               continue;
@@ -148,14 +150,14 @@ public class OperatorFrame extends JFrame {
             });
           } catch (IOException clientError) {
             if (!localServerSocket.isClosed()) {
-              SwingUtilities.invokeLater(() ->
-                  statusLabel.setText("Error de red al recibir cliente: " + clientError.getMessage()));
+              SwingUtilities.invokeLater(
+                  () -> statusLabel.setText("Error de red al recibir cliente: " + clientError.getMessage()));
             }
           }
         }
       } catch (IOException serverError) {
-        SwingUtilities.invokeLater(() ->
-            statusLabel.setText("No se pudo iniciar el servidor: " + serverError.getMessage()));
+        SwingUtilities
+            .invokeLater(() -> statusLabel.setText("No se pudo iniciar el servidor: " + serverError.getMessage()));
       }
     }, "operator-socket-listener");
 
