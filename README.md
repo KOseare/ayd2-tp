@@ -1,5 +1,11 @@
 # Sistema de Gestión de Filas
 
+## Setup
+
+### Variables de entorno
+
+Crear archivo .env en la raíz del proyecto siguiendo el ejemplo de .env.example.
+
 ## Compilar
 
 ```bash
