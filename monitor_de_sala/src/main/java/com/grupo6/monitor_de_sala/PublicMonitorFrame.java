@@ -1,9 +1,12 @@
 package com.grupo6.monitor_de_sala;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.GridLayout;
+import java.awt.Insets;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -25,6 +28,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
 import com.grupo6.environment.Environment;
+import com.grupo6.ui.AppUiTheme;
 
 public class PublicMonitorFrame extends JFrame {
 
@@ -41,38 +45,74 @@ public class PublicMonitorFrame extends JFrame {
   public PublicMonitorFrame() {
     setTitle("Monitor de Sala");
     setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-    setSize(720, 480);
+    setMinimumSize(new Dimension(520, 520));
+    setSize(720, 560);
     setLocationRelativeTo(null);
 
-    JLabel currentTitle = new JLabel("Turno actual", SwingConstants.CENTER);
-    currentTitle.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
+    Font base = AppUiTheme.baseUiFont();
+    Font historyFont = base.deriveFont(Font.PLAIN, 20f);
+    Font statusFont = base.deriveFont(Font.PLAIN, 12f);
+
+    JLabel currentCaption = new JLabel("TURNO ACTUAL", SwingConstants.CENTER);
+    currentCaption.setFont(base.deriveFont(Font.BOLD, 11f));
+    currentCaption.setForeground(AppUiTheme.TEXT_MUTED);
 
     currentTurnLabel = new JLabel("-", SwingConstants.CENTER);
-    currentTurnLabel.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 72));
-    currentTurnLabel.setForeground(new Color(0xff, 0xff, 0xff));
-    currentTurnLabel.setOpaque(true);
-    currentTurnLabel.setBackground(new Color(0x15, 0x65, 0xc0));
-    currentTurnLabel.setBorder(BorderFactory.createEmptyBorder(16, 24, 16, 24));
+    currentTurnLabel.setFont(base.deriveFont(Font.BOLD, 64f));
+    currentTurnLabel.setForeground(AppUiTheme.TEXT_HERO_DNI);
+    currentTurnLabel.setOpaque(false);
+
+    JPanel hero = new JPanel(new BorderLayout(0, 10));
+    hero.setBackground(AppUiTheme.BG_HERO);
+    hero.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(AppUiTheme.BORDER_HERO, 2),
+        BorderFactory.createEmptyBorder(20, 24, 28, 24)));
+    hero.add(currentCaption, BorderLayout.NORTH);
+    hero.add(currentTurnLabel, BorderLayout.CENTER);
 
     statusLabel = new JLabel("Estado: esperando turno", SwingConstants.CENTER);
+    statusLabel.setFont(statusFont);
+    statusLabel.setForeground(AppUiTheme.TEXT_BODY);
 
-    JPanel currentPanel = new JPanel(new BorderLayout());
-    currentPanel.setBorder(BorderFactory.createTitledBorder("Atencion"));
-    currentPanel.add(currentTitle, BorderLayout.NORTH);
-    currentPanel.add(currentTurnLabel, BorderLayout.CENTER);
-    currentPanel.add(statusLabel, BorderLayout.SOUTH);
+    JLabel historyCaption = new JLabel("HISTORIAL RECIENTE", SwingConstants.CENTER);
+    historyCaption.setFont(base.deriveFont(Font.BOLD, 11f));
+    historyCaption.setForeground(AppUiTheme.TEXT_MUTED);
 
-    JPanel historyPanel = new JPanel(new GridLayout(5, 1, 8, 8));
-    historyPanel.setBorder(BorderFactory.createTitledBorder("Historial"));
+    JPanel historyPanel = new JPanel(new GridLayout(HISTORY_LIMIT, 1, 8, 8));
+    historyPanel.setOpaque(false);
     for (int index = 0; index < HISTORY_LIMIT; index++) {
-      JLabel row = historyRow("-");
+      JLabel row = historyRow("-", historyFont);
       historyRows.add(row);
       historyPanel.add(row);
     }
 
-    setLayout(new BorderLayout(8, 8));
-    add(currentPanel, BorderLayout.CENTER);
-    add(historyPanel, BorderLayout.SOUTH);
+    JPanel historyBlock = new JPanel(new BorderLayout(0, 10));
+    historyBlock.setOpaque(false);
+    historyBlock.add(historyCaption, BorderLayout.NORTH);
+    historyBlock.add(historyPanel, BorderLayout.CENTER);
+
+    JPanel statusWrap = new JPanel(new GridBagLayout());
+    statusWrap.setOpaque(false);
+    GridBagConstraints gc = new GridBagConstraints();
+    gc.gridx = 0;
+    gc.gridy = 0;
+    gc.weightx = 1;
+    gc.fill = GridBagConstraints.HORIZONTAL;
+    gc.insets = new Insets(0, 0, 8, 0);
+    statusWrap.add(statusLabel, gc);
+
+    JPanel south = new JPanel(new BorderLayout(0, 16));
+    south.setOpaque(false);
+    south.add(statusWrap, BorderLayout.NORTH);
+    south.add(historyBlock, BorderLayout.CENTER);
+
+    JPanel root = new JPanel(new BorderLayout(16, 16));
+    root.setBackground(AppUiTheme.BG_APP);
+    root.setBorder(BorderFactory.createEmptyBorder(16, 20, 20, 20));
+    root.add(hero, BorderLayout.CENTER);
+    root.add(south, BorderLayout.SOUTH);
+
+    setContentPane(root);
     addWindowListener(new WindowAdapter() {
       @Override
       public void windowClosing(WindowEvent e) {
@@ -89,13 +129,14 @@ public class PublicMonitorFrame extends JFrame {
     startServerListener();
   }
 
-  private static JLabel historyRow(String doc) {
+  private static JLabel historyRow(String doc, Font font) {
     JLabel row = new JLabel(doc, SwingConstants.CENTER);
-    row.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 22));
+    row.setFont(font);
+    row.setForeground(AppUiTheme.TEXT_BODY);
     row.setOpaque(true);
-    row.setBackground(new Color(0xf5, 0xf5, 0xf5));
+    row.setBackground(AppUiTheme.BG_CARD);
     row.setBorder(BorderFactory.createCompoundBorder(
-        BorderFactory.createLineBorder(new Color(0xdd, 0xdd, 0xdd)),
+        BorderFactory.createLineBorder(AppUiTheme.BORDER_CARD, 1),
         BorderFactory.createEmptyBorder(8, 12, 8, 12)));
     return row;
   }
