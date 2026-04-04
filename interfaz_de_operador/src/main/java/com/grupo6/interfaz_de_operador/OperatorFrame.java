@@ -59,11 +59,11 @@ public class OperatorFrame extends JFrame {
     queueCountLabel.setFont(secondaryFont);
     queueCountLabel.setForeground(AppUiTheme.TEXT_MUTED);
 
-    nextInQueueLabel = new JLabel("Próximo en cola: -", SwingConstants.CENTER);
+    nextInQueueLabel = new JLabel("Proximo en cola: -", SwingConstants.CENTER);
     nextInQueueLabel.setFont(secondaryFont);
     nextInQueueLabel.setForeground(AppUiTheme.TEXT_MUTED);
 
-    lastCalledCaption = new JLabel("ÚLTIMO LLAMADO", SwingConstants.CENTER);
+    lastCalledCaption = new JLabel("ULTIMO LLAMADO", SwingConstants.CENTER);
     lastCalledCaption.setFont(base.deriveFont(Font.BOLD, 11f));
     lastCalledCaption.setForeground(AppUiTheme.TEXT_MUTED);
 
@@ -181,7 +181,7 @@ public class OperatorFrame extends JFrame {
   private synchronized void updateQueueLabels() {
     queueCountLabel.setText("Clientes en espera: " + waitingQueue.size());
     String nextDni = waitingQueue.peek();
-    nextInQueueLabel.setText("Próximo en cola: " + (nextDni == null ? "-" : nextDni));
+    nextInQueueLabel.setText("Proximo en cola: " + (nextDni == null ? "-" : nextDni));
   }
 
   private void startSocketListener() {
