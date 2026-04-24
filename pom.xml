@@ -15,6 +15,7 @@
         <module>interfaz_de_operador</module>
         <module>monitor_de_sala</module>
         <module>terminal_de_registro</module>
+        <module>servidor</module>
     </modules>
 
     <dependencies>
