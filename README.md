@@ -45,3 +45,13 @@ mvn -pl terminal_de_registro exec:java -Dexec.mainClass="com.grupo6.terminal_de_
 ```bash
 java -jar terminal_de_registro/target/terminal_de_registro-1.0.jar
 ```
+
+### Servidor
+
+```bash
+mvn -pl servidor exec:java -Dexec.mainClass="com.grupo6.servidor.Main"
+```
+
+```bash
+java -jar servidor/target/servidor-1.0.jar
+```
