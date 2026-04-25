@@ -23,6 +23,8 @@ import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 
 import com.grupo6.environment.Environment;
+import com.grupo6.environment.QueueProtocol;
+import com.grupo6.terminal_de_registro.net.QueueServerClient;
 import com.grupo6.ui.AppUiTheme;
 
 public class RegistrationTerminalFrame extends JFrame {
@@ -51,18 +53,36 @@ public class RegistrationTerminalFrame extends JFrame {
   }
 
   private void sendData(String dni) {
+    String serverLine;
+    try {
+      serverLine = QueueServerClient.registrarCliente(dni);
+    } catch (IOException e) {
+      statusLabel.setText("Error servidor (registrar): " + e.getMessage());
+      JOptionPane.showMessageDialog(
+          this,
+          "No fue posible contactar al servidor de cola.\n" + e.getMessage(),
+          "Error de conexion",
+          JOptionPane.ERROR_MESSAGE);
+      return;
+    }
+
+    if (serverLine == null || !serverLine.startsWith(QueueProtocol.OK_PREFIX)) {
+      statusLabel.setText("Servidor: " + (serverLine == null ? "sin respuesta" : serverLine));
+      return;
+    }
+
     try (Socket socket = new Socket(OPERATOR_HOST, OPERATOR_PORT);
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
       out.println(dni);
-      statusLabel.setText("Registro exitoso. DNI enviado: " + dni);
+      statusLabel.setText("Registro: " + serverLine + " | DNI reenviado a operador.");
       documentField.setText("");
     } catch (UnknownHostException e) {
-      statusLabel.setText("Error de red: host operador invalido.");
+      statusLabel.setText("Error de red: host operador invalido. Servidor acepto: " + serverLine);
     } catch (IOException e) {
-      statusLabel.setText("No se pudo conectar al operador. Esta encendido?");
+      statusLabel.setText("No se pudo conectar al operador. Servidor: " + serverLine);
       JOptionPane.showMessageDialog(
           this,
-          "No fue posible enviar el DNI porque la interfaz de operador no responde.\n" + e.getMessage(),
+          "No fue posible enviar el DNI a la interfaz de operador.\n" + e.getMessage(),
           "Error de conexion",
           JOptionPane.ERROR_MESSAGE);
     }

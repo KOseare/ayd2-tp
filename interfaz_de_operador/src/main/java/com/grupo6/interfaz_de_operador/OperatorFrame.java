@@ -27,6 +27,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
 import com.grupo6.environment.Environment;
+import com.grupo6.interfaz_de_operador.net.QueueServerClient;
 import com.grupo6.ui.AppUiTheme;
 
 public class OperatorFrame extends JFrame {
@@ -141,22 +142,32 @@ public class OperatorFrame extends JFrame {
   }
 
   private void callNextClient() {
+    String serverLine;
+    try {
+      serverLine = QueueServerClient.llamarCliente();
+    } catch (IOException e) {
+      statusLabel.setText("Estado: error con servidor (llamar). " + e.getMessage());
+      return;
+    }
+
     String calledDni;
     synchronized (this) {
       calledDni = waitingQueue.poll();
     }
     if (calledDni == null) {
-      statusLabel.setText("Estado: no hay clientes en espera.");
+      statusLabel
+          .setText("Estado: cola local vacia. Servidor: " + (serverLine == null ? "-" : serverLine));
       return;
     }
 
     String dniToSend = calledDni;
-    Thread sendThread = new Thread(() -> sendToMonitor(dniToSend), "operator-monitor-sender");
+    String finalServerLine = serverLine;
+    Thread sendThread = new Thread(() -> sendToMonitor(dniToSend, finalServerLine), "operator-monitor-sender");
     sendThread.setDaemon(true);
     sendThread.start();
   }
 
-  private void sendToMonitor(String calledDni) {
+  private void sendToMonitor(String calledDni, String serverLlamarResponse) {
     try (Socket socket = new Socket(MONITOR_HOST, MONITOR_PORT);
         PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
       writer.println(calledDni);
@@ -165,7 +176,8 @@ public class OperatorFrame extends JFrame {
           lastCalledDniLabel.setText(calledDni);
           updateQueueLabels();
         }
-        statusLabel.setText("Estado: Atencion " + calledDni);
+        statusLabel.setText("Estado: Atencion " + calledDni
+            + " | Servidor: " + (serverLlamarResponse == null ? "-" : serverLlamarResponse));
       });
     } catch (IOException e) {
       SwingUtilities.invokeLater(() -> {
