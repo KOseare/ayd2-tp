@@ -1,6 +1,7 @@
 package com.grupo6.monitor_de_sala;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
@@ -10,14 +11,12 @@ import java.awt.Insets;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.ServerSocket;
+import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 
 import javax.swing.BorderFactory;
 import javax.swing.JFrame;
@@ -25,6 +24,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
 import com.grupo6.environment.Environment;
@@ -33,14 +33,16 @@ import com.grupo6.ui.AppUiTheme;
 public class PublicMonitorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
-  private static final int MONITOR_PORT = Environment.MONITOR_PORT;
+  private static final String SERVER_HOST = Environment.SERVER_HOST;
+  private static final int SERVER_PORT = Environment.SERVER_PORT;
   private static final int HISTORY_LIMIT = 5;
 
   private final JLabel currentTurnLabel;
-  private final JLabel statusLabel;
+  private final JLabel currentStationLabel;
+  private final JLabel errorLabel;
   private final List<JLabel> historyRows = new ArrayList<>();
   private final Deque<String> callHistory = new ArrayDeque<>();
-  private ServerSocket serverSocket;
+  private final Font historyFont;
 
   public PublicMonitorFrame() {
     setTitle("Monitor de Sala");
@@ -50,7 +52,7 @@ public class PublicMonitorFrame extends JFrame {
     setLocationRelativeTo(null);
 
     Font base = AppUiTheme.baseUiFont();
-    Font historyFont = base.deriveFont(Font.PLAIN, 20f);
+    historyFont = base.deriveFont(Font.PLAIN, 20f);
     Font statusFont = base.deriveFont(Font.PLAIN, 12f);
 
     JLabel currentCaption = new JLabel("TURNO ACTUAL", SwingConstants.CENTER);
@@ -62,6 +64,10 @@ public class PublicMonitorFrame extends JFrame {
     currentTurnLabel.setForeground(AppUiTheme.TEXT_HERO_DNI);
     currentTurnLabel.setOpaque(false);
 
+    currentStationLabel = new JLabel("Puesto ID: -", SwingConstants.CENTER);
+    currentStationLabel.setFont(base.deriveFont(Font.BOLD, 24f));
+    currentStationLabel.setForeground(AppUiTheme.TEXT_BODY);
+
     JPanel hero = new JPanel(new BorderLayout(0, 10));
     hero.setBackground(AppUiTheme.BG_HERO);
     hero.setBorder(BorderFactory.createCompoundBorder(
@@ -69,10 +75,11 @@ public class PublicMonitorFrame extends JFrame {
         BorderFactory.createEmptyBorder(20, 24, 28, 24)));
     hero.add(currentCaption, BorderLayout.NORTH);
     hero.add(currentTurnLabel, BorderLayout.CENTER);
+    hero.add(currentStationLabel, BorderLayout.SOUTH);
 
-    statusLabel = new JLabel("Estado: esperando turno", SwingConstants.CENTER);
-    statusLabel.setFont(statusFont);
-    statusLabel.setForeground(AppUiTheme.TEXT_BODY);
+    errorLabel = new JLabel("", SwingConstants.CENTER);
+    errorLabel.setFont(statusFont);
+    errorLabel.setForeground(new Color(180, 30, 30));
 
     JLabel historyCaption = new JLabel("HISTORIAL RECIENTE", SwingConstants.CENTER);
     historyCaption.setFont(base.deriveFont(Font.BOLD, 11f));
@@ -99,7 +106,7 @@ public class PublicMonitorFrame extends JFrame {
     gc.weightx = 1;
     gc.fill = GridBagConstraints.HORIZONTAL;
     gc.insets = new Insets(0, 0, 8, 0);
-    statusWrap.add(statusLabel, gc);
+    statusWrap.add(errorLabel, gc);
 
     JPanel south = new JPanel(new BorderLayout(0, 16));
     south.setOpaque(false);
@@ -113,20 +120,7 @@ public class PublicMonitorFrame extends JFrame {
     root.add(south, BorderLayout.SOUTH);
 
     setContentPane(root);
-    addWindowListener(new WindowAdapter() {
-      @Override
-      public void windowClosing(WindowEvent e) {
-        if (serverSocket != null && !serverSocket.isClosed()) {
-          try {
-            serverSocket.close();
-          } catch (IOException ignored) {
-            // No action needed during close.
-          }
-        }
-      }
-    });
-
-    startServerListener();
+    startMonitorClient();
   }
 
   private static JLabel historyRow(String doc, Font font) {
@@ -141,44 +135,84 @@ public class PublicMonitorFrame extends JFrame {
     return row;
   }
 
-  private void startServerListener() {
+  private void startMonitorClient() {
     Thread listenerThread = new Thread(() -> {
-      try (ServerSocket localServerSocket = new ServerSocket(MONITOR_PORT)) {
-        serverSocket = localServerSocket;
-        while (!Thread.currentThread().isInterrupted()) {
-          try (Socket socket = localServerSocket.accept();
-              BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-            String dni = reader.readLine();
-            if (dni == null || dni.trim().isEmpty()) {
-              continue;
-            }
-            String normalizedDni = dni.trim();
-            SwingUtilities.invokeLater(() -> updateTurn(normalizedDni));
-          } catch (IOException clientError) {
-            if (!localServerSocket.isClosed()) {
-              SwingUtilities
-                  .invokeLater(() -> statusLabel.setText("Error de red en recepcion: " + clientError.getMessage()));
-            }
+      while (!Thread.currentThread().isInterrupted()) {
+        try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT);
+            PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+
+          writer.println("SUBSCRIBE_MONITOR");
+          String subscribedAck = reader.readLine();
+          if (subscribedAck == null || !subscribedAck.startsWith("OK|SUBSCRIBED")) {
+            SwingUtilities.invokeLater(() -> showError("Error de suscripcion"));
+            sleepQuietly(2000);
+            continue;
           }
+
+          SwingUtilities.invokeLater(this::clearError);
+          String line;
+          while ((line = reader.readLine()) != null) {
+            String eventLine = line;
+            SwingUtilities.invokeLater(() -> handleEvent(eventLine));
+          }
+        } catch (IOException e) {
+          SwingUtilities.invokeLater(() -> showError("Error de conexion con servidor"));
+          sleepQuietly(2000);
         }
-      } catch (IOException serverError) {
-        SwingUtilities
-            .invokeLater(() -> statusLabel.setText("No se pudo iniciar servidor: " + serverError.getMessage()));
       }
-    }, "monitor-server-listener");
+    }, "monitor-client-listener");
 
     listenerThread.setDaemon(true);
     listenerThread.start();
   }
 
-  private void updateTurn(String dni) {
-    callHistory.addFirst(dni);
+  private void handleEvent(String eventLine) {
+    String[] parts = eventLine.split("\\|");
+    if (parts.length < 2 || !"EVENT".equals(parts[0])) {
+      showError("Error: mensaje no valido");
+      return;
+    }
+
+    if ("CALL".equals(parts[1]) && parts.length >= 4) {
+      String dni = parts[2];
+      String stationId = parts[3];
+      updateTurn(dni, stationId);
+      clearError();
+      return;
+    }
+
+    if ("RENOTIFY".equals(parts[1]) && parts.length >= 5) {
+      String dni = parts[2];
+      String stationId = parts[3];
+      updateCurrentTurnOnly(dni, stationId);
+      runPriorityBlink();
+      clearError();
+      return;
+    }
+
+    if ("REMOVED".equals(parts[1]) && parts.length >= 4) {
+      clearError();
+      return;
+    }
+
+    if ("FINALIZED".equals(parts[1]) && parts.length >= 4) {
+      clearError();
+      return;
+    }
+
+    showError("Error: evento no soportado");
+  }
+
+  private void updateTurn(String dni, String stationId) {
+    String rowText = dni + " - Puesto " + stationId;
+    callHistory.addFirst(rowText);
     while (callHistory.size() > HISTORY_LIMIT) {
       callHistory.removeLast();
     }
 
     currentTurnLabel.setText(dni);
-    statusLabel.setText("Estado: Atencion " + dni);
+    currentStationLabel.setText("Puesto ID: " + stationId);
 
     int index = 0;
     for (String value : callHistory) {
@@ -188,6 +222,52 @@ public class PublicMonitorFrame extends JFrame {
     while (index < HISTORY_LIMIT) {
       historyRows.get(index).setText("-");
       index++;
+    }
+  }
+
+  private void updateCurrentTurnOnly(String dni, String stationId) {
+    currentTurnLabel.setText(dni);
+    currentStationLabel.setText("Puesto ID: " + stationId);
+  }
+
+  private void showError(String message) {
+    errorLabel.setText(message);
+  }
+
+  private void clearError() {
+    errorLabel.setText("");
+  }
+
+  private void runPriorityBlink() {
+    final int[] ticks = {0};
+    Timer timer = new Timer(200, null);
+    timer.addActionListener(e -> {
+      if (ticks[0] % 2 == 0) {
+        currentTurnLabel.setForeground(AppUiTheme.TEXT_HERO_DNI);
+        currentTurnLabel.setOpaque(true);
+        currentTurnLabel.setBackground(AppUiTheme.BG_HERO);
+      } else {
+        currentTurnLabel.setForeground(AppUiTheme.BG_APP);
+        currentTurnLabel.setOpaque(true);
+        currentTurnLabel.setBackground(AppUiTheme.TEXT_HERO_DNI);
+      }
+      currentTurnLabel.repaint();
+      ticks[0]++;
+      if (ticks[0] >= 6) {
+        timer.stop();
+        currentTurnLabel.setOpaque(false);
+        currentTurnLabel.setForeground(AppUiTheme.TEXT_HERO_DNI);
+        currentTurnLabel.repaint();
+      }
+    });
+    timer.start();
+  }
+
+  private void sleepQuietly(long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException interruptedException) {
+      Thread.currentThread().interrupt();
     }
   }
 }
