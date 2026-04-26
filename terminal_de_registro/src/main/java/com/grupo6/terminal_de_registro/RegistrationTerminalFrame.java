@@ -24,8 +24,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
 import com.grupo6.environment.Environment;
@@ -40,8 +38,6 @@ public class RegistrationTerminalFrame extends JFrame {
 
   private final JTextField documentField;
   private final JLabel errorLabel;
-  private final JLabel queueCountLabel;
-  private final Timer queueRefreshTimer;
 
   private void registerClient() {
     String dni = documentField.getText() == null ? "" : documentField.getText().trim();
@@ -77,7 +73,6 @@ public class RegistrationTerminalFrame extends JFrame {
       if (response.startsWith("OK|REGISTERED|")) {
         documentField.setText("");
         clearError();
-        refreshQueueCountAsync();
         return;
       }
 
@@ -104,40 +99,6 @@ public class RegistrationTerminalFrame extends JFrame {
     }
   }
 
-  private String sendSimpleCommand(String command) {
-    try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT);
-        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-      out.println(command);
-      return in.readLine();
-    } catch (IOException e) {
-      return "ERROR|NETWORK";
-    }
-  }
-
-  private void refreshQueueCountAsync() {
-    Thread thread = new Thread(() -> {
-      String response = sendSimpleCommand("GET_QUEUE_SIZE");
-      SwingUtilities.invokeLater(() -> applyQueueCountResponse(response));
-    }, "registration-queue-refresh");
-    thread.setDaemon(true);
-    thread.start();
-  }
-
-  private void applyQueueCountResponse(String response) {
-    if (response == null) {
-      queueCountLabel.setText("Personas en cola: -");
-      showError("Error: sin respuesta del servidor.");
-      return;
-    }
-    if (response.startsWith("OK|QUEUE_SIZE|")) {
-      String count = response.substring("OK|QUEUE_SIZE|".length());
-      queueCountLabel.setText("Personas en cola: " + count);
-      return;
-    }
-    queueCountLabel.setText("Personas en cola: -");
-  }
-
   private void showError(String message) {
     errorLabel.setText(message);
   }
@@ -160,10 +121,6 @@ public class RegistrationTerminalFrame extends JFrame {
     JLabel hint = new JLabel("Solo numeros, sin puntos ni espacios.", SwingConstants.CENTER);
     hint.setFont(secondaryFont);
     hint.setForeground(AppUiTheme.TEXT_MUTED);
-
-    queueCountLabel = new JLabel("Personas en cola: -", SwingConstants.CENTER);
-    queueCountLabel.setFont(secondaryFont);
-    queueCountLabel.setForeground(AppUiTheme.TEXT_BODY);
 
     JLabel heroCaption = new JLabel("INGRESE SU DOCUMENTO", SwingConstants.CENTER);
     heroCaption.setFont(base.deriveFont(Font.BOLD, 11f));
@@ -214,9 +171,6 @@ public class RegistrationTerminalFrame extends JFrame {
     gc.weightx = 1;
     gc.fill = GridBagConstraints.HORIZONTAL;
     hintPanel.add(hint, gc);
-    gc.gridy = 1;
-    gc.insets = new Insets(6, 0, 0, 0);
-    hintPanel.add(queueCountLabel, gc);
 
     JPanel root = new JPanel(new BorderLayout(16, 16));
     root.setBackground(AppUiTheme.BG_APP);
@@ -226,15 +180,5 @@ public class RegistrationTerminalFrame extends JFrame {
     root.add(footer, BorderLayout.SOUTH);
 
     setContentPane(root);
-
-    queueRefreshTimer = new Timer(3000, e -> refreshQueueCountAsync());
-    queueRefreshTimer.start();
-    refreshQueueCountAsync();
-    addWindowListener(new WindowAdapter() {
-      @Override
-      public void windowClosing(WindowEvent e) {
-        queueRefreshTimer.stop();
-      }
-    });
   }
 }

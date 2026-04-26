@@ -21,6 +21,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
 import com.grupo6.environment.Environment;
@@ -34,12 +35,14 @@ public class OperatorFrame extends JFrame {
 
   private String stationId;
   private final JLabel stationLabel;
+  private final JLabel queueCountLabel;
   private final JLabel lastCalledCaption;
   private final JLabel lastCalledDniLabel;
   private final JLabel errorLabel;
   private final JButton callNextButton;
   private final JButton renotifyButton;
   private final JButton finalizeButton;
+  private final Timer queueRefreshTimer;
   private String currentDni;
   private final Font activeDniFont;
   private final Font idleDniFont;
@@ -61,6 +64,10 @@ public class OperatorFrame extends JFrame {
     stationLabel = new JLabel("Puesto: no asignado", SwingConstants.CENTER);
     stationLabel.setFont(secondaryFont);
     stationLabel.setForeground(AppUiTheme.TEXT_MUTED);
+
+    queueCountLabel = new JLabel("Personas en cola: -", SwingConstants.CENTER);
+    queueCountLabel.setFont(base.deriveFont(Font.BOLD, 16f));
+    queueCountLabel.setForeground(AppUiTheme.TEXT_HERO_DNI);
 
     lastCalledCaption = new JLabel("ULTIMO LLAMADO", SwingConstants.CENTER);
     lastCalledCaption.setFont(base.deriveFont(Font.BOLD, 11f));
@@ -112,18 +119,26 @@ public class OperatorFrame extends JFrame {
     JPanel root = new JPanel(new BorderLayout(16, 16));
     root.setBackground(AppUiTheme.BG_APP);
     root.setBorder(BorderFactory.createEmptyBorder(16, 20, 20, 20));
-    root.add(stationLabel, BorderLayout.NORTH);
+    JPanel header = new JPanel(new BorderLayout(0, 8));
+    header.setOpaque(false);
+    header.add(stationLabel, BorderLayout.NORTH);
+    header.add(queueCountLabel, BorderLayout.SOUTH);
+    root.add(header, BorderLayout.NORTH);
     root.add(hero, BorderLayout.CENTER);
     root.add(footer, BorderLayout.SOUTH);
 
     setContentPane(root);
+    queueRefreshTimer = new Timer(3000, e -> refreshQueueCountAsync());
+    queueRefreshTimer.start();
     addWindowListener(new WindowAdapter() {
       @Override
       public void windowClosing(WindowEvent e) {
+        queueRefreshTimer.stop();
         releaseStationId();
       }
     });
     claimStationIdOrFail();
+    refreshQueueCountAsync();
     updateButtonsState();
   }
 
@@ -175,12 +190,29 @@ public class OperatorFrame extends JFrame {
     }
   }
 
+  private void refreshQueueCountAsync() {
+    runAsync(() -> {
+      String response = sendCommand("GET_QUEUE_SIZE");
+      SwingUtilities.invokeLater(() -> applyQueueCountResponse(response));
+    });
+  }
+
+  private void applyQueueCountResponse(String response) {
+    if (response != null && response.startsWith("OK|QUEUE_SIZE|")) {
+      String count = response.substring("OK|QUEUE_SIZE|".length());
+      queueCountLabel.setText("Personas en cola: " + count);
+      return;
+    }
+    queueCountLabel.setText("Personas en cola: sin datos");
+  }
+
   private void handleCallNextResponse(String response) {
     if (response.startsWith("OK|CALLED|")) {
       currentDni = response.substring("OK|CALLED|".length());
       lastCalledDniLabel.setText(currentDni);
       lastCalledDniLabel.setFont(activeDniFont);
       clearError();
+      refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
@@ -189,6 +221,7 @@ public class OperatorFrame extends JFrame {
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
+      refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
@@ -198,6 +231,7 @@ public class OperatorFrame extends JFrame {
       lastCalledDniLabel.setText(activeDni);
       lastCalledDniLabel.setFont(activeDniFont);
       clearError();
+      refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
@@ -213,6 +247,7 @@ public class OperatorFrame extends JFrame {
       } else {
         clearError();
       }
+      refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
@@ -221,6 +256,7 @@ public class OperatorFrame extends JFrame {
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
+      refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
@@ -229,6 +265,7 @@ public class OperatorFrame extends JFrame {
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
+      refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
@@ -241,6 +278,7 @@ public class OperatorFrame extends JFrame {
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
+      refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
@@ -249,6 +287,7 @@ public class OperatorFrame extends JFrame {
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
+      refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
