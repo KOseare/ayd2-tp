@@ -192,6 +192,7 @@ public class PublicMonitorFrame extends JFrame {
     }
 
     if ("REMOVED".equals(parts[1]) && parts.length >= 4) {
+      updateCurrentTurnOnly("-", "-");
       clearError();
       return;
     }
@@ -239,7 +240,7 @@ public class PublicMonitorFrame extends JFrame {
   }
 
   private void runPriorityBlink() {
-    final int[] ticks = {0};
+    final int[] ticks = { 0 };
     Timer timer = new Timer(200, null);
     timer.addActionListener(e -> {
       if (ticks[0] % 2 == 0) {
