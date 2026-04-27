@@ -118,10 +118,6 @@ public class RegistrationTerminalFrame extends JFrame {
     Font secondaryFont = base.deriveFont(Font.PLAIN, 13f);
     Font statusFont = base.deriveFont(Font.PLAIN, 12f);
 
-    JLabel hint = new JLabel("Solo numeros, sin puntos ni espacios.", SwingConstants.CENTER);
-    hint.setFont(secondaryFont);
-    hint.setForeground(AppUiTheme.TEXT_MUTED);
-
     JLabel heroCaption = new JLabel("INGRESE SU DOCUMENTO", SwingConstants.CENTER);
     heroCaption.setFont(base.deriveFont(Font.BOLD, 11f));
     heroCaption.setForeground(AppUiTheme.TEXT_MUTED);
@@ -149,7 +145,7 @@ public class RegistrationTerminalFrame extends JFrame {
     errorLabel.setFont(statusFont);
     errorLabel.setForeground(new java.awt.Color(180, 30, 30));
 
-    JButton joinButton = new JButton("Unirse a la lista de espera");
+    JButton joinButton = new JButton("Registrarse");
     joinButton.setFont(base.deriveFont(Font.BOLD, 14f));
     joinButton.setMargin(new Insets(12, 28, 12, 28));
     joinButton.addActionListener(e -> registerClient());
@@ -163,19 +159,15 @@ public class RegistrationTerminalFrame extends JFrame {
     buttonRow.add(joinButton);
     footer.add(buttonRow, BorderLayout.CENTER);
 
-    JPanel hintPanel = new JPanel(new GridBagLayout());
-    hintPanel.setOpaque(false);
     GridBagConstraints gc = new GridBagConstraints();
     gc.gridx = 0;
     gc.gridy = 0;
     gc.weightx = 1;
     gc.fill = GridBagConstraints.HORIZONTAL;
-    hintPanel.add(hint, gc);
 
     JPanel root = new JPanel(new BorderLayout(16, 16));
     root.setBackground(AppUiTheme.BG_APP);
     root.setBorder(BorderFactory.createEmptyBorder(16, 20, 20, 20));
-    root.add(hintPanel, BorderLayout.NORTH);
     root.add(hero, BorderLayout.CENTER);
     root.add(footer, BorderLayout.SOUTH);
 

@@ -32,6 +32,7 @@ public class OperatorFrame extends JFrame {
   private static final long serialVersionUID = 1L;
   private static final String SERVER_HOST = Environment.SERVER_HOST;
   private static final int SERVER_PORT = Environment.SERVER_PORT;
+  private static final int RENOTIFY_COOLDOWN_MS = 30_000;
 
   private String stationId;
   private final JLabel stationLabel;
@@ -43,6 +44,8 @@ public class OperatorFrame extends JFrame {
   private final JButton renotifyButton;
   private final JButton finalizeButton;
   private final Timer queueRefreshTimer;
+  private final Timer buttonsRefreshTimer;
+  private long renotifyEnabledAtMs;
   private String currentDni;
   private final Font activeDniFont;
   private final Font idleDniFont;
@@ -130,10 +133,13 @@ public class OperatorFrame extends JFrame {
     setContentPane(root);
     queueRefreshTimer = new Timer(3000, e -> refreshQueueCountAsync());
     queueRefreshTimer.start();
+    buttonsRefreshTimer = new Timer(1000, e -> updateButtonsState());
+    buttonsRefreshTimer.start();
     addWindowListener(new WindowAdapter() {
       @Override
       public void windowClosing(WindowEvent e) {
         queueRefreshTimer.stop();
+        buttonsRefreshTimer.stop();
         releaseStationId();
       }
     });
@@ -212,12 +218,14 @@ public class OperatorFrame extends JFrame {
       lastCalledDniLabel.setText(currentDni);
       lastCalledDniLabel.setFont(activeDniFont);
       clearError();
+      scheduleRenotifyCooldown();
       refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
     if ("OK|NO_PENDING".equals(response)) {
       currentDni = null;
+      clearRenotifyCooldown();
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
@@ -247,12 +255,14 @@ public class OperatorFrame extends JFrame {
       } else {
         clearError();
       }
+      scheduleRenotifyCooldown();
       refreshQueueCountAsync();
       updateButtonsState();
       return;
     }
     if (response.startsWith("OK|REMOVED_BY_LIMIT|")) {
       currentDni = null;
+      clearRenotifyCooldown();
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
@@ -262,6 +272,7 @@ public class OperatorFrame extends JFrame {
     }
     if ("ERROR|NO_ACTIVE_CLIENT".equals(response)) {
       currentDni = null;
+      clearRenotifyCooldown();
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
@@ -275,6 +286,7 @@ public class OperatorFrame extends JFrame {
   private void handleFinalizeResponse(String response) {
     if (response.startsWith("OK|FINALIZED|")) {
       currentDni = null;
+      clearRenotifyCooldown();
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
@@ -284,6 +296,7 @@ public class OperatorFrame extends JFrame {
     }
     if ("ERROR|NO_ACTIVE_CLIENT".equals(response)) {
       currentDni = null;
+      clearRenotifyCooldown();
       lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
       clearError();
@@ -302,9 +315,20 @@ public class OperatorFrame extends JFrame {
     errorLabel.setText("");
   }
 
+  private void scheduleRenotifyCooldown() {
+    renotifyEnabledAtMs = System.currentTimeMillis() + RENOTIFY_COOLDOWN_MS;
+  }
+
+  private void clearRenotifyCooldown() {
+    renotifyEnabledAtMs = 0L;
+  }
+
   private void updateButtonsState() {
     boolean hasCurrent = currentDni != null && !currentDni.isEmpty();
-    renotifyButton.setEnabled(hasCurrent);
+    long now = System.currentTimeMillis();
+    boolean renotifyOk =
+        hasCurrent && (renotifyEnabledAtMs == 0L || now >= renotifyEnabledAtMs);
+    renotifyButton.setEnabled(renotifyOk);
     finalizeButton.setEnabled(hasCurrent);
   }
 
