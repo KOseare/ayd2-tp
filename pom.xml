@@ -17,6 +17,7 @@
         <module>monitor_de_sala</module>
         <module>terminal_de_registro</module>
         <module>servidor</module>
+        <module>monitor</module>
     </modules>
 
     <dependencies>
