@@ -8,11 +8,7 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -27,15 +23,14 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
-import com.grupo6.environment.Environment;
+import com.grupo6.conexion_servidor.ConexionServidor;
 import com.grupo6.ui.AppUiTheme;
 
 public class PublicMonitorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
-  private static final String SERVER_HOST = Environment.SERVER_HOST;
-  private static final int SERVER_PORT = Environment.SERVER_PORT;
   private static final int HISTORY_LIMIT = 5;
+  private final ConexionServidor conexionServidor = new ConexionServidor();
 
   private final JLabel currentTurnLabel;
   private final JLabel currentStationLabel;
@@ -138,12 +133,8 @@ public class PublicMonitorFrame extends JFrame {
   private void startMonitorClient() {
     Thread listenerThread = new Thread(() -> {
       while (!Thread.currentThread().isInterrupted()) {
-        try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT);
-            PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-
-          writer.println("SUBSCRIBE_MONITOR");
-          String subscribedAck = reader.readLine();
+        try {
+          String subscribedAck = conexionServidor.sendCommand("SUBSCRIBE_MONITOR");
           if (subscribedAck == null || !subscribedAck.startsWith("OK|SUBSCRIBED")) {
             SwingUtilities.invokeLater(() -> showError("Error de suscripcion"));
             sleepQuietly(2000);
@@ -152,7 +143,7 @@ public class PublicMonitorFrame extends JFrame {
 
           SwingUtilities.invokeLater(this::clearError);
           String line;
-          while ((line = reader.readLine()) != null) {
+          while ((line = conexionServidor.readNext()) != null) {
             String eventLine = line;
             SwingUtilities.invokeLater(() -> handleEvent(eventLine));
           }

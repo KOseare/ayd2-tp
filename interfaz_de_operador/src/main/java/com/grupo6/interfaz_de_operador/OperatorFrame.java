@@ -7,11 +7,6 @@ import java.awt.Font;
 import java.awt.Insets;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -24,15 +19,14 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
-import com.grupo6.environment.Environment;
+import com.grupo6.conexion_servidor.ConexionServidor;
 import com.grupo6.ui.AppUiTheme;
 
 public class OperatorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
-  private static final String SERVER_HOST = Environment.SERVER_HOST;
-  private static final int SERVER_PORT = Environment.SERVER_PORT;
   private static final int RENOTIFY_COOLDOWN_MS = 30_000;
+  private final ConexionServidor conexionServidor = new ConexionServidor();
 
   private String stationId;
   private final JLabel stationLabel;
@@ -182,16 +176,11 @@ public class OperatorFrame extends JFrame {
   }
 
   private String sendCommand(String command) {
-    try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT);
-        PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-        BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-      writer.println(command);
-      String response = reader.readLine();
-      if (response == null) {
-        return "ERROR|NO_RESPONSE";
-      }
-      return response;
-    } catch (IOException e) {
+    try {
+      return conexionServidor.sendCommand(command);
+    } catch (Exception e) {
+      // TODO: Verificar mensaje de error (ya no es IOException ya que se atrapa
+      // dentro de conexionServidor)
       return "ERROR|NETWORK|" + e.getMessage();
     }
   }
@@ -326,8 +315,7 @@ public class OperatorFrame extends JFrame {
   private void updateButtonsState() {
     boolean hasCurrent = currentDni != null && !currentDni.isEmpty();
     long now = System.currentTimeMillis();
-    boolean renotifyOk =
-        hasCurrent && (renotifyEnabledAtMs == 0L || now >= renotifyEnabledAtMs);
+    boolean renotifyOk = hasCurrent && (renotifyEnabledAtMs == 0L || now >= renotifyEnabledAtMs);
     renotifyButton.setEnabled(renotifyOk);
     finalizeButton.setEnabled(hasCurrent);
   }

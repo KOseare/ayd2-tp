@@ -1,17 +1,29 @@
 package com.grupo6.environment;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import io.github.cdimascio.dotenv.Dotenv;
 
 public abstract class Environment {
   private static final Dotenv env = Dotenv.configure().ignoreIfMissing().load();
 
-  public static final String SERVER_HOST = getString("SERVER_HOST", "127.0.0.1");
-  public static final int SERVER_PORT = getInt("SERVER_PORT", 7000);
+  public static final int cantidadNodos = getInt("CANTIDAD_NODOS", 5);
+  public static final String monitorHost = getString("MONITOR_HOST", "localhost");
+  public static final int monitorPort = getInt("MONITOR_PORT", 3006);
 
-  public static final String MONITOR_HOST = getString("MONITOR_HOST", SERVER_HOST);
-  public static final int MONITOR_PORT = getInt("MONITOR_PORT", 3002);
-  public static final String OPERATOR_HOST = getString("OPERATOR_HOST", SERVER_HOST);
-  public static final int OPERATOR_PORT = getInt("OPERATOR_PORT", 3001);
+  public static final List<ServerAddress> nodosServidores = getServidores();
+
+  private static List<ServerAddress> getServidores() {
+    final int nqty = getInt("CANTIDAD_NODOS", 3);
+    final List<ServerAddress> r = new ArrayList<ServerAddress>();
+    for (int i = 0; i < nqty; i++) {
+      final String host = "SERVER_HOST_" + i;
+      final String port = "SERVER_PORT_" + i;
+      r.add(new ServerAddress(getString(host, "localhost"), getInt(port, 0)));
+    }
+    return r;
+  }
 
   private static String getString(String key, String defaultValue) {
     String value = env.get(key);

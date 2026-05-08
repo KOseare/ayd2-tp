@@ -4,38 +4,26 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.regex.Pattern;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 
-import com.grupo6.environment.Environment;
+import com.grupo6.conexion_servidor.ConexionServidor;
 import com.grupo6.ui.AppUiTheme;
 
 public class RegistrationTerminalFrame extends JFrame {
-
   private static final long serialVersionUID = 1L;
-  private static final String SERVER_HOST = Environment.SERVER_HOST;
-  private static final int SERVER_PORT = Environment.SERVER_PORT;
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
+  private final ConexionServidor conexionServidor = new ConexionServidor();
   private final JTextField documentField;
   private final JLabel errorLabel;
 
@@ -60,11 +48,8 @@ public class RegistrationTerminalFrame extends JFrame {
   }
 
   private void sendData(String dni) {
-    try (Socket socket = new Socket(SERVER_HOST, SERVER_PORT);
-        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-      out.println("REGISTER|" + dni);
-      String response = in.readLine();
+    try {
+      final String response = conexionServidor.sendCommand("REGISTER|" + dni);
       if (response == null) {
         showError("Error: sin respuesta del servidor.");
         return;
@@ -87,15 +72,8 @@ public class RegistrationTerminalFrame extends JFrame {
       }
 
       showError("Error del servidor: " + response);
-    } catch (UnknownHostException e) {
-      showError("Error de red: host servidor invalido.");
-    } catch (IOException e) {
-      showError("No se pudo conectar al servidor.");
-      JOptionPane.showMessageDialog(
-          this,
-          "No fue posible enviar el DNI porque el servidor no responde.\n" + e.getMessage(),
-          "Error de conexion",
-          JOptionPane.ERROR_MESSAGE);
+    } catch (Exception e) {
+      showError("Hubo un error: " + e.getMessage());
     }
   }
 
@@ -115,7 +93,6 @@ public class RegistrationTerminalFrame extends JFrame {
     setLocationRelativeTo(null);
 
     Font base = AppUiTheme.baseUiFont();
-    Font secondaryFont = base.deriveFont(Font.PLAIN, 13f);
     Font statusFont = base.deriveFont(Font.PLAIN, 12f);
 
     JLabel heroCaption = new JLabel("INGRESE SU DOCUMENTO", SwingConstants.CENTER);
