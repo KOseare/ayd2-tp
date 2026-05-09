@@ -69,6 +69,12 @@ public class ConexionServidor {
           }
         } catch (IOException e) {
           onError.onMessage("ERROR|NETWORK|" + e.getMessage());
+          sleepQuietly(2000);
+          tries++;
+          if (tries >= maxTries) {
+            hallarNodoActivo();
+            tries = 0;
+          }
         }
       }
     }, "monitor-client-listener");
