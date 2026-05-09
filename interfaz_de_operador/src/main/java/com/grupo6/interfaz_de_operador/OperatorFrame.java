@@ -140,6 +140,25 @@ public class OperatorFrame extends JFrame {
     claimStationIdOrFail();
     refreshQueueCountAsync();
     updateButtonsState();
+    listenToQueueUpdates();
+  }
+
+  private void listenToQueueUpdates() {
+    conexionServidor.subscribeAndListen("SUBSCRIBE_OPERATOR", (String msg) -> handleUpdate(msg),
+        (String msg) -> handleError(msg));
+  }
+
+  private void handleUpdate(String msg) {
+    if (msg != null && msg.startsWith("OK|QUEUE_SIZE|")) {
+      String count = msg.substring("OK|QUEUE_SIZE|".length());
+      queueCountLabel.setText("Personas en cola: " + count);
+      return;
+    }
+    queueCountLabel.setText("Personas en cola: sin datos");
+  }
+
+  private void handleError(String msg) {
+    showError(msg);
   }
 
   private void callNextClient() {

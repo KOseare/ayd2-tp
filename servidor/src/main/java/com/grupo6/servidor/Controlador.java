@@ -20,6 +20,7 @@ public class Controlador {
   private final FilaTurnos fila = new FilaTurnos();
   private final Set<String> claimedStationIds = new HashSet<>();
   private final List<PrintWriter> monitorSubscribers = new ArrayList<>();
+  private final List<PrintWriter> operatorSubscribers = new ArrayList<>();
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
   public void subscribeMonitor(PrintWriter writer, BufferedReader reader) throws IOException {
@@ -35,6 +36,23 @@ public class Controlador {
     } finally {
       synchronized (this) {
         monitorSubscribers.remove(writer);
+      }
+    }
+  }
+
+  public void subscribeOperator(PrintWriter writer, BufferedReader reader) throws IOException {
+    synchronized (this) {
+      operatorSubscribers.add(writer);
+    }
+    writer.println("OK|SUBSCRIBED");
+
+    try {
+      while (reader.readLine() != null) {
+        // Keep stream open while monitor is connected.
+      }
+    } finally {
+      synchronized (this) {
+        operatorSubscribers.remove(writer);
       }
     }
   }
@@ -59,6 +77,7 @@ public class Controlador {
       return;
     }
     fila.registrarCliente(cliente);
+    broadcastToOperators("OK|QUEUE_SIZE|" + fila.obtenerCantidadTurnos());
     writer.println("OK|REGISTERED|" + dni);
   }
 
@@ -119,9 +138,8 @@ public class Controlador {
       case ASIGNADO:
         r.getReemplazado()
             .ifPresent(
-                previous ->
-                    broadcastToMonitors(
-                        "EVENT|REMOVED|" + previous.getDni() + "|" + stationId));
+                previous -> broadcastToMonitors(
+                    "EVENT|REMOVED|" + previous.getDni() + "|" + stationId));
         Turno asignado = r.getAsignado().orElse(null);
         if (asignado == null) {
           writer.println("OK|NO_PENDING");
@@ -187,6 +205,17 @@ public class Controlador {
       }
     }
     monitorSubscribers.removeAll(disconnected);
+  }
+
+  private synchronized void broadcastToOperators(String message) {
+    List<PrintWriter> disconnected = new ArrayList<>();
+    for (PrintWriter writer : operatorSubscribers) {
+      writer.println(message);
+      if (writer.checkError()) {
+        disconnected.add(writer);
+      }
+    }
+    operatorSubscribers.removeAll(disconnected);
   }
 
   private boolean isValidDni(String dni) {

@@ -12,6 +12,8 @@ import com.grupo6.environment.ServerAddress;
 public class ConexionServidor {
   private static final int maxTries = 3;
   private final List<ServerAddress> nodosServidores = Environment.nodosServidores;
+  private Socket socket = null;
+  private BufferedReader reader = null;
   private int activeId = -1;
 
   private boolean ensureInitialized() {
@@ -39,13 +41,39 @@ public class ConexionServidor {
     return enc;
   }
 
-  public String readNext() throws IOException {
-    ensureInitialized();
-    final ServerAddress addr = nodosServidores.get(activeId);
-    final Socket socket = new Socket(addr.host, addr.port);
-    BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-    final String result = reader.readLine();
-    return result;
+  public void subscribeAndListen(String subscribeCommand, Callback onMessage, Callback onError) {
+    Thread t = new Thread(() -> {
+      ensureInitialized();
+      int tries = 1;
+      while (!Thread.currentThread().isInterrupted()) {
+        try {
+          final ServerAddress addr = nodosServidores.get(activeId);
+          socket = new Socket(addr.host, addr.port);
+          PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+          reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+          writer.println(subscribeCommand);
+          String subscribedAck = reader.readLine();
+          if (subscribedAck == null || !subscribedAck.startsWith("OK|SUBSCRIBED")) {
+            onError.onMessage("Error de suscripcion");
+            sleepQuietly(2000);
+            tries++;
+            if (tries >= maxTries) {
+              hallarNodoActivo();
+              tries = 0;
+            }
+            continue;
+          }
+          String response = null;
+          while ((response = reader.readLine()) != null) {
+            onMessage.onMessage(response);
+          }
+        } catch (IOException e) {
+          onError.onMessage("ERROR|NETWORK|" + e.getMessage());
+        }
+      }
+    }, "monitor-client-listener");
+    t.setDaemon(true);
+    t.start();
   }
 
   public String sendCommand(String command) {
@@ -76,12 +104,11 @@ public class ConexionServidor {
   private String sendCommandOneTry(String command) {
     try {
       final ServerAddress addr = nodosServidores.get(activeId);
-      Socket socket = new Socket(addr.host, addr.port);
+      socket = new Socket(addr.host, addr.port);
       PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-      BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+      reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
       writer.println(command);
       String response = reader.readLine();
-      socket.close();
       if (response == null) {
         return "ERROR|NO_RESPONSE";
       }
@@ -98,13 +125,20 @@ public class ConexionServidor {
       BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
       writer.println(msg);
       String response = reader.readLine();
-      socket.close();
       if (response == null) {
         return "ERROR|NO_RESPONSE";
       }
       return response;
     } catch (IOException e) {
       return "ERROR|NETWORK|" + e.getMessage();
+    }
+  }
+
+  private void sleepQuietly(long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException interruptedException) {
+      Thread.currentThread().interrupt();
     }
   }
 }

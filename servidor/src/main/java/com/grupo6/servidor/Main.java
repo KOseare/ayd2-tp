@@ -86,6 +86,10 @@ public class Main {
         service.subscribeMonitor(writer, reader);
         return;
       }
+      if ("SUBSCRIBE_OPERATOR".equals(command)) {
+        service.subscribeOperator(writer, reader);
+        return;
+      }
 
       if ("REGISTER".equals(command)) {
         service.handleRegister(parts, writer);

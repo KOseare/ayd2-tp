@@ -23,6 +23,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
+import com.grupo6.conexion_servidor.Callback;
 import com.grupo6.conexion_servidor.ConexionServidor;
 import com.grupo6.ui.AppUiTheme;
 
@@ -131,31 +132,12 @@ public class PublicMonitorFrame extends JFrame {
   }
 
   private void startMonitorClient() {
-    Thread listenerThread = new Thread(() -> {
-      while (!Thread.currentThread().isInterrupted()) {
-        try {
-          String subscribedAck = conexionServidor.sendCommand("SUBSCRIBE_MONITOR");
-          if (subscribedAck == null || !subscribedAck.startsWith("OK|SUBSCRIBED")) {
-            SwingUtilities.invokeLater(() -> showError("Error de suscripcion"));
-            sleepQuietly(2000);
-            continue;
-          }
-
-          SwingUtilities.invokeLater(this::clearError);
-          String line;
-          while ((line = conexionServidor.readNext()) != null) {
-            String eventLine = line;
-            SwingUtilities.invokeLater(() -> handleEvent(eventLine));
-          }
-        } catch (IOException e) {
-          SwingUtilities.invokeLater(() -> showError("Error de conexion con servidor"));
-          sleepQuietly(2000);
-        }
-      }
-    }, "monitor-client-listener");
-
-    listenerThread.setDaemon(true);
-    listenerThread.start();
+    conexionServidor.subscribeAndListen("SUBSCRIBE_MONITOR",
+        (String msg) -> {
+          SwingUtilities.invokeLater(() -> handleEvent(msg));
+        }, (String err) -> {
+          SwingUtilities.invokeLater(() -> showError(err));
+        });
   }
 
   private void handleEvent(String eventLine) {
