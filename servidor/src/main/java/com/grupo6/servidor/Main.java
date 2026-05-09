@@ -69,7 +69,7 @@ public class Main {
       writer.println(status.toUpperCase());
     } else if (message.toUpperCase().contains("UPDATE_STATE")) {
       // TODO: Update state
-    } else if (message.toUpperCase().contains("PING")) {
+    } else if (message.toUpperCase().contains("PING") && status == "ACTIVE") {
       writer.println("OK");
     } else {
       return false;
