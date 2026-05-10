@@ -8,12 +8,15 @@ import com.grupo6.modelo.Turno;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class Controlador {
 
@@ -21,6 +24,7 @@ public class Controlador {
   private final Set<String> claimedStationIds = new HashSet<>();
   private final List<PrintWriter> monitorSubscribers = new ArrayList<>();
   private final List<PrintWriter> operatorSubscribers = new ArrayList<>();
+  private final List<PrintWriter> replicaSubscribers = new ArrayList<>();
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
   public void subscribeMonitor(PrintWriter writer, BufferedReader reader) throws IOException {
@@ -57,6 +61,51 @@ public class Controlador {
     }
   }
 
+  public void subscribeReplica(PrintWriter writer, BufferedReader reader) throws IOException {
+    synchronized (this) {
+      replicaSubscribers.add(writer);
+      writer.println("OK|SUBSCRIBED");
+      writer.println(buildFullStateLine());
+    }
+    try {
+      while (reader.readLine() != null) {
+        // Keep stream open; passive servers do not send commands on this socket.
+      }
+    } finally {
+      synchronized (this) {
+        replicaSubscribers.remove(writer);
+      }
+    }
+  }
+
+  public synchronized void clearReplicaSubscribers() {
+    replicaSubscribers.clear();
+  }
+
+  public synchronized void applyFullStateFromLeaderLine(String line) {
+    if (line == null || !line.startsWith("STATE_FULL|")) {
+      throw new IllegalArgumentException("Unexpected snapshot line");
+    }
+    String encoded = line.substring("STATE_FULL|".length());
+    byte[] decoded = Base64.getDecoder().decode(encoded);
+    String body = new String(decoded, StandardCharsets.UTF_8);
+    int sep = body.indexOf("\n--\n");
+    if (sep < 0) {
+      throw new IllegalArgumentException("Malformed snapshot body");
+    }
+    String claimsBlock = body.substring(0, sep);
+    String filaBlob = body.substring(sep + "\n--\n".length());
+    claimedStationIds.clear();
+    if (!claimsBlock.isEmpty()) {
+      for (String s : claimsBlock.split("\n", -1)) {
+        if (!s.isEmpty()) {
+          claimedStationIds.add(s);
+        }
+      }
+    }
+    fila.replaceStateFromBlob(filaBlob.trim());
+  }
+
   public synchronized void handleRegister(String[] parts, PrintWriter writer) {
     if (parts.length < 2) {
       writer.println("ERROR|INVALID_REGISTER");
@@ -79,6 +128,7 @@ public class Controlador {
     fila.registrarCliente(cliente);
     broadcastToOperators("OK|QUEUE_SIZE|" + fila.obtenerCantidadTurnos());
     writer.println("OK|REGISTERED|" + dni);
+    pushFullStateToReplicas();
   }
 
   public synchronized void handleClaimStation(String[] parts, PrintWriter writer) {
@@ -97,6 +147,7 @@ public class Controlador {
     }
     claimedStationIds.add(stationId);
     writer.println("OK|STATION_CLAIMED|" + stationId);
+    pushFullStateToReplicas();
   }
 
   public synchronized void handleReleaseStation(String[] parts, PrintWriter writer) {
@@ -111,6 +162,7 @@ public class Controlador {
     }
     claimedStationIds.remove(stationId);
     writer.println("OK|STATION_RELEASED|" + stationId);
+    pushFullStateToReplicas();
   }
 
   public synchronized void handleGetQueueSize(PrintWriter writer) {
@@ -147,6 +199,7 @@ public class Controlador {
         }
         writer.println("OK|CALLED|" + asignado.getDni());
         broadcastToMonitors("EVENT|CALL|" + asignado.getDni() + "|" + stationId);
+        pushFullStateToReplicas();
         return;
       default:
         writer.println("ERROR|UNKNOWN_COMMAND");
@@ -169,11 +222,13 @@ public class Controlador {
         int intentos = r.getIntentos();
         broadcastToMonitors("EVENT|RENOTIFY|" + dniN + "|" + stationId + "|" + intentos);
         writer.println("OK|RENOTIFIED|" + dniN + "|" + intentos);
+        pushFullStateToReplicas();
         return;
       case REMOVIDO_POR_LIMITE:
         String dniL = r.getDni().orElse("");
         writer.println("OK|REMOVED_BY_LIMIT|" + dniL);
         broadcastToMonitors("EVENT|REMOVED|" + dniL + "|" + stationId);
+        pushFullStateToReplicas();
         return;
       default:
         writer.println("ERROR|UNKNOWN_COMMAND");
@@ -194,6 +249,7 @@ public class Controlador {
     String dni = finalized.get().getDni();
     writer.println("OK|FINALIZED|" + dni);
     broadcastToMonitors("EVENT|FINALIZED|" + dni + "|" + stationId);
+    pushFullStateToReplicas();
   }
 
   private synchronized void broadcastToMonitors(String message) {
@@ -216,6 +272,29 @@ public class Controlador {
       }
     }
     operatorSubscribers.removeAll(disconnected);
+  }
+
+  private String buildFullStateLine() {
+    String claimsBlock =
+        claimedStationIds.stream().sorted().collect(Collectors.joining("\n"));
+    String body = claimsBlock + "\n--\n" + fila.exportStateBlob();
+    return "STATE_FULL|"
+        + Base64.getEncoder().encodeToString(body.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private void pushFullStateToReplicas() {
+    if (replicaSubscribers.isEmpty()) {
+      return;
+    }
+    String line = buildFullStateLine();
+    List<PrintWriter> dead = new ArrayList<>();
+    for (PrintWriter replicaWriter : replicaSubscribers) {
+      replicaWriter.println(line);
+      if (replicaWriter.checkError()) {
+        dead.add(replicaWriter);
+      }
+    }
+    replicaSubscribers.removeAll(dead);
   }
 
   private boolean isValidDni(String dni) {

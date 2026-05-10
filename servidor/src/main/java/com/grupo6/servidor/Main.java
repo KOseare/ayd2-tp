@@ -9,12 +9,16 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 
 public class Main {
   private static int port = 0;
-  private static Controlador service = new Controlador();
-  private static String status = "standby"; // initial, synchronizing, standby, active
+  private static final Controlador service = new Controlador();
+  private static String status = "standby"; // "standby" o "ACTIVE"
   private static int id = -1;
+
+  private static final Object replicaLock = new Object();
+  private static volatile Thread replicaWorker = null;
 
   public static void main(String[] args) {
     try {
@@ -53,7 +57,7 @@ public class Main {
       }
 
       final boolean isMonitorEvent = handleMonitorEvent(writer, firstLine);
-      if (!isMonitorEvent && status.equals("ACTIVE")) {
+      if (!isMonitorEvent && "ACTIVE".equalsIgnoreCase(status)) {
         handleClient(reader, writer, firstLine, service);
       }
     } catch (IOException ignored) {
@@ -62,25 +66,161 @@ public class Main {
   }
 
   private static boolean handleMonitorEvent(PrintWriter writer, String message) {
-    if (message.toUpperCase().contains("START")) {
-      status = "ACTIVE";
-      writer.println("OK");
-    } else if (message.toUpperCase().contains("STATUS_UPDATE_REQUEST")) {
-      writer.println(status.toUpperCase());
-    } else if (message.toUpperCase().contains("UPDATE_STATE")) {
-      // TODO: Update state
-    } else if (message.toUpperCase().contains("PING") && status == "ACTIVE") {
-      writer.println("OK");
-    } else {
-      return false;
+    final String trimmed = message.trim();
+    final String upper = trimmed.toUpperCase();
+    if (upper.startsWith("CURRENT_ACTIVE_NODE|")) {
+      final String[] p = trimmed.split("\\|", -1);
+      if (p.length < 2) {
+        writer.println("ERROR|INVALID_MESSAGE");
+        return true;
+      }
+      try {
+        final int leader = Integer.parseInt(p[1].trim());
+        onCurrentActiveNodeAnnouncement(leader);
+        writer.println("OK");
+      } catch (NumberFormatException e) {
+        writer.println("ERROR|INVALID_LEADER");
+      }
+      return true;
     }
-    return true;
+    if (upper.contains("START")) {
+      status = "ACTIVE";
+      stopReplicaClientSession();
+      service.clearReplicaSubscribers();
+      writer.println("OK");
+      return true;
+    }
+    if (upper.contains("STATUS_UPDATE_REQUEST")) {
+      writer.println(status.toUpperCase());
+      return true;
+    }
+    if (upper.contains("UPDATE_STATE")) {
+      // TODO: Update state
+      writer.println("OK");
+      return true;
+    }
+    if (upper.contains("PING") && "ACTIVE".equalsIgnoreCase(status)) {
+      writer.println("OK");
+      return true;
+    }
+    return false;
+  }
+
+  private static void onCurrentActiveNodeAnnouncement(int leaderId) {
+    if (leaderId == id) {
+      stopReplicaClientSession();
+      return;
+    }
+    if (leaderId < 0 || leaderId >= Environment.nodosServidores.size()) {
+      System.err.println("Replica: leader id fuera de rango: " + leaderId);
+      return;
+    }
+    status = "standby";
+    startReplicaClientSessionIfNeeded(leaderId);
+  }
+
+  private static void startReplicaClientSessionIfNeeded(int leaderId) {
+    synchronized (replicaLock) {
+      stopReplicaClientSessionUnsynchronized();
+      Thread t = new Thread(() -> replicaRunLoop(leaderId), "replica-client-" + leaderId);
+      t.setDaemon(true);
+      replicaWorker = t;
+      t.start();
+    }
+  }
+
+  private static void stopReplicaClientSession() {
+    synchronized (replicaLock) {
+      stopReplicaClientSessionUnsynchronized();
+    }
+  }
+
+  private static void stopReplicaClientSessionUnsynchronized() {
+    Thread t = replicaWorker;
+    replicaWorker = null;
+    if (t != null) {
+      t.interrupt();
+      try {
+        t.join(2000);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private static void replicaRunLoop(int leaderId) {
+    while (!Thread.currentThread().isInterrupted()) {
+      if (leaderId == id) {
+        return;
+      }
+      try {
+        runOneReplicaConnection(leaderId);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+      if (Thread.currentThread().isInterrupted()) {
+        return;
+      }
+      System.out.println("Replica client: reconectando al líder " + leaderId + "...");
+      sleepQuietly(2000);
+    }
+  }
+
+  private static void runOneReplicaConnection(int leaderId) throws InterruptedException {
+    final ServerAddress addr = Environment.nodosServidores.get(leaderId);
+    try (Socket socket = new Socket(addr.host, addr.port);
+        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+      socket.setSoTimeout(5000);
+      out.println("SUBSCRIBE_REPLICA");
+      final String ack = in.readLine();
+      if (ack == null || !ack.startsWith("OK|SUBSCRIBED")) {
+        return;
+      }
+      String line;
+      while (!Thread.currentThread().isInterrupted()) {
+        try {
+          line = in.readLine();
+        } catch (SocketTimeoutException e) {
+          if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException();
+          }
+          continue;
+        }
+        if (line == null) {
+          return;
+        }
+        if (line.startsWith("STATE_FULL|")) {
+          try {
+            synchronized (service) {
+              service.applyFullStateFromLeaderLine(line);
+            }
+          } catch (RuntimeException ex) {
+            System.err.println("Replica snapshot apply failed: " + ex.getMessage());
+          }
+        }
+      }
+    } catch (IOException e) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException();
+      }
+      System.err.println("Replica IO error: " + e.getMessage());
+    }
+  }
+
+  private static void sleepQuietly(long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private static void handleClient(BufferedReader reader, PrintWriter writer, String message, Controlador service) {
     try {
-      String[] parts = message.trim().split("\\|");
-      String command = parts[0];
+      final String[] parts = message.trim().split("\\|");
+      final String command = parts[0];
 
       if ("SUBSCRIBE_MONITOR".equals(command)) {
         service.subscribeMonitor(writer, reader);
@@ -88,6 +228,10 @@ public class Main {
       }
       if ("SUBSCRIBE_OPERATOR".equals(command)) {
         service.subscribeOperator(writer, reader);
+        return;
+      }
+      if ("SUBSCRIBE_REPLICA".equals(command)) {
+        service.subscribeReplica(writer, reader);
         return;
       }
 
