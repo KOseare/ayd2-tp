@@ -14,16 +14,24 @@ public class Monitor {
   private final List<ServerAddress> nodos = Environment.nodosServidores;
   private int activeNodeId = -1;
 
+  private static void log(String message) {
+    System.out.println("[MONITOR] " + message);
+  }
+
+  private static void logErr(String message) {
+    System.err.println("[MONITOR] " + message);
+  }
+
   public void start() {
+    log("iniciado; nodos=" + nodos.size());
     while (true) {
       if (activeNodeId < 0) {
-        System.out.println("No hay un nodo activo");
+        log("sin líder — elección");
         selectNewActiveNode();
       } else {
         String response = sendCommandTo(nodos.get(activeNodeId), "PING");
-        System.out.println("PING response: " + response);
         if (!response.toUpperCase().contains("OK")) {
-          // TODO: Lógica de reintento y buscar nuevo nodo activo
+          log("PING falló al líder índice " + activeNodeId + " (" + response + ") — reelección");
           selectNewActiveNode();
         }
       }
@@ -35,31 +43,31 @@ public class Monitor {
     try {
       Thread.sleep(1500);
     } catch (InterruptedException e) {
-      System.out.println("InterruptedException: " + e.getMessage());
+      Thread.currentThread().interrupt();
     }
-
   }
 
   private void setActiveNodeAndNotify(int id) {
     activeNodeId = id;
-    System.out.println("Active node: " + id);
-    for (ServerAddress addr : nodos) {
-      sendCommandTo(addr, "CURRENT_ACTIVE_NODE|" + id);
+    log("líder=" + id + "; difundiendo CURRENT_ACTIVE_NODE");
+    for (int i = 0; i < nodos.size(); i++) {
+      sendCommandTo(nodos.get(i), "CURRENT_ACTIVE_NODE|" + id);
     }
   }
 
   private void selectNewActiveNode() {
-    for (ServerAddress addr : nodos) {
+    for (int i = 0; i < nodos.size(); i++) {
+      final ServerAddress addr = nodos.get(i);
       String response = sendCommandTo(addr, "STATUS_UPDATE_REQUEST");
       if (response.toUpperCase().contains("STANDBY")) {
         response = sendCommandTo(addr, "START");
         if (response.toUpperCase().contains("OK")) {
-          setActiveNodeAndNotify(nodos.indexOf(addr));
-          break;
+          setActiveNodeAndNotify(i);
+          return;
         }
       }
     }
-    // TODO: Caso en el que ningún nodo está en estado STANDBY
+    logErr("elección fallida: ningún STANDBY aceptó START");
   }
 
   private String sendCommandTo(ServerAddress node, String command) {
@@ -75,6 +83,7 @@ public class Monitor {
       }
       return response;
     } catch (IOException e) {
+      logErr("error red hacia " + node.host + ":" + node.port + " — " + e.getMessage());
       return "ERROR|NETWORK|" + e.getMessage();
     }
   }

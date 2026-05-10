@@ -20,6 +20,21 @@ public class Main {
   private static final Object replicaLock = new Object();
   private static volatile Thread replicaWorker = null;
 
+  /** Prefix {@code [SERVIDOR-<id>-ACTIVO|STANDBY]} for stdout logs from {@link #logSrv}. */
+  static String serverLogPrefix() {
+    final String role = "ACTIVE".equalsIgnoreCase(status) ? "ACTIVO" : "STANDBY";
+    final String nid = id >= 0 ? String.valueOf(id) : "?";
+    return "[SERVIDOR-" + nid + "-" + role + "]";
+  }
+
+  static void logSrv(String message) {
+    System.out.println(serverLogPrefix() + " " + message);
+  }
+
+  static void logSrvErr(String message) {
+    System.err.println(serverLogPrefix() + " " + message);
+  }
+
   public static void main(String[] args) {
     try {
       id = Integer.parseInt(args[0]);
@@ -27,13 +42,14 @@ public class Main {
       port = addr.port;
       startServer(port, service);
     } catch (Exception e) {
-      System.err.println("No se pudo iniciar el servidor: " + e.getMessage());
+      final String pre = id >= 0 ? serverLogPrefix() : "[SERVIDOR-?-STANDBY]";
+      System.err.println(pre + " No se pudo iniciar el servidor: " + e.getMessage());
     }
   }
 
   private static void startServer(int port, Controlador service) {
     try (ServerSocket serverSocket = new ServerSocket(port)) {
-      System.out.println("Servidor iniciado en puerto " + port);
+      logSrv("Servidor escuchando en puerto " + port);
       while (true) {
         Socket socket = serverSocket.accept();
         Thread clientThread = new Thread(() -> handleEvent(socket, service), "server-client-handler");
@@ -41,7 +57,7 @@ public class Main {
         clientThread.start();
       }
     } catch (IOException e) {
-      System.out.println("Error: " + e.getMessage());
+      logSrv("Error en ServerSocket: " + e.getMessage());
     }
   }
 
@@ -50,7 +66,7 @@ public class Main {
         BufferedReader reader = new BufferedReader(new InputStreamReader(localSocket.getInputStream()));
         PrintWriter writer = new PrintWriter(localSocket.getOutputStream(), true)) {
       String firstLine = reader.readLine();
-      System.out.println("Nueva petición: " + firstLine);
+      logSrv("request: " + firstLine);
       if (firstLine == null || firstLine.trim().isEmpty()) {
         writer.println("ERROR|EMPTY_MESSAGE");
         return;
@@ -80,10 +96,12 @@ public class Main {
         writer.println("OK");
       } catch (NumberFormatException e) {
         writer.println("ERROR|INVALID_LEADER");
+        logSrvErr("monitor: CURRENT_ACTIVE_NODE inválido");
       }
       return true;
     }
     if (upper.contains("START")) {
+      logSrv("evento monitor: START — nodo promovido a ACTIVO");
       status = "ACTIVE";
       stopReplicaClientSession();
       service.clearReplicaSubscribers();
@@ -108,14 +126,16 @@ public class Main {
 
   private static void onCurrentActiveNodeAnnouncement(int leaderId) {
     if (leaderId == id) {
+      logSrv("cluster: confirmado como líder índice " + id);
       stopReplicaClientSession();
       return;
     }
     if (leaderId < 0 || leaderId >= Environment.nodosServidores.size()) {
-      System.err.println("Replica: leader id fuera de rango: " + leaderId);
+      logSrvErr("CURRENT_ACTIVE_NODE: índice de líder inválido: " + leaderId);
       return;
     }
     status = "standby";
+    logSrv("rol: pasivo — réplica hacia líder " + leaderId);
     startReplicaClientSessionIfNeeded(leaderId);
   }
 
@@ -162,7 +182,6 @@ public class Main {
       if (Thread.currentThread().isInterrupted()) {
         return;
       }
-      System.out.println("Replica client: reconectando al líder " + leaderId + "...");
       sleepQuietly(2000);
     }
   }
@@ -176,6 +195,7 @@ public class Main {
       out.println("SUBSCRIBE_REPLICA");
       final String ack = in.readLine();
       if (ack == null || !ack.startsWith("OK|SUBSCRIBED")) {
+        logSrvErr("réplica: fallo suscripción al líder " + leaderId + " ACK=" + ack);
         return;
       }
       String line;
@@ -197,7 +217,7 @@ public class Main {
               service.applyFullStateFromLeaderLine(line);
             }
           } catch (RuntimeException ex) {
-            System.err.println("Replica snapshot apply failed: " + ex.getMessage());
+            logSrvErr("réplica: error aplicando STATE_FULL (" + ex.getMessage() + ")");
           }
         }
       }
@@ -205,7 +225,7 @@ public class Main {
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedException();
       }
-      System.err.println("Replica IO error: " + e.getMessage());
+      logSrvErr("réplica: error de IO: " + e.getMessage());
     }
   }
 
@@ -271,8 +291,9 @@ public class Main {
       }
 
       writer.println("ERROR|UNKNOWN_COMMAND");
+
     } catch (IOException e) {
-      System.out.println("Error: " + e.getMessage());
+      logSrvErr("handleClient: " + e.getMessage());
     }
   }
 }
