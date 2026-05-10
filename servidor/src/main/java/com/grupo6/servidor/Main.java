@@ -101,7 +101,7 @@ public class Main {
       return true;
     }
     if (upper.contains("START")) {
-      logSrv("evento monitor: START — nodo promovido a ACTIVO");
+      logSrv("evento monitor: START - nodo promovido a ACTIVO");
       status = "ACTIVE";
       stopReplicaClientSession();
       service.clearReplicaSubscribers();
@@ -135,7 +135,7 @@ public class Main {
       return;
     }
     status = "standby";
-    logSrv("rol: pasivo — replica hacia lider " + leaderId);
+    logSrv("rol: pasivo - replica hacia lider " + leaderId);
     startReplicaClientSessionIfNeeded(leaderId);
   }
 

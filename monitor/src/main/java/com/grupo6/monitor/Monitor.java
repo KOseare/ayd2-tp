@@ -26,12 +26,12 @@ public class Monitor {
     log("iniciado; nodos=" + nodos.size());
     while (true) {
       if (activeNodeId < 0) {
-        log("sin lider — eleccion");
+        log("sin lider - eleccion");
         selectNewActiveNode();
       } else {
         String response = sendCommandTo(nodos.get(activeNodeId), "PING");
         if (!response.toUpperCase().contains("OK")) {
-          log("PING fallo al lider indice " + activeNodeId + " (" + response + ") — reeleccion");
+          log("PING fallo al lider indice " + activeNodeId + " (" + response + ") - reeleccion");
           selectNewActiveNode();
         }
       }
@@ -83,7 +83,7 @@ public class Monitor {
       }
       return response;
     } catch (IOException e) {
-      logErr("error red hacia " + node.host + ":" + node.port + " — " + e.getMessage());
+      logErr("error red hacia " + node.host + ":" + node.port + " - " + e.getMessage());
       return "ERROR|NETWORK|" + e.getMessage();
     }
   }

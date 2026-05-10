@@ -207,18 +207,20 @@ public class FilaTurnos {
   }
 
   private static String encodeTurn(Turno t) {
-    String est = t.getEstacion() == null ? "" : escapePipe(t.getEstacion());
-    return t.getId()
-        + '|'
-        + escapePipe(t.getDni())
-        + '|'
-        + t.getEstado().name()
-        + '|'
-        + t.getNroLlamados()
-        + '|'
-        + est
-        + '|'
-        + t.getRegistro().getTime();
+    final String est = t.getEstacion() == null ? "" : escapePipe(t.getEstacion());
+    return new StringBuilder()
+        .append(t.getId())
+        .append('|')
+        .append(escapePipe(t.getDni()))
+        .append('|')
+        .append(t.getEstado().name())
+        .append('|')
+        .append(t.getNroLlamados())
+        .append('|')
+        .append(est)
+        .append('|')
+        .append(t.getRegistro().getTime())
+        .toString();
   }
 
   private static Turno decodeTurn(String rec) {
