@@ -26,12 +26,12 @@ public class Monitor {
     log("iniciado; nodos=" + nodos.size());
     while (true) {
       if (activeNodeId < 0) {
-        log("sin líder — elección");
+        log("sin lider — eleccion");
         selectNewActiveNode();
       } else {
         String response = sendCommandTo(nodos.get(activeNodeId), "PING");
         if (!response.toUpperCase().contains("OK")) {
-          log("PING falló al líder índice " + activeNodeId + " (" + response + ") — reelección");
+          log("PING fallo al lider indice " + activeNodeId + " (" + response + ") — reeleccion");
           selectNewActiveNode();
         }
       }
@@ -49,7 +49,7 @@ public class Monitor {
 
   private void setActiveNodeAndNotify(int id) {
     activeNodeId = id;
-    log("líder=" + id + "; difundiendo CURRENT_ACTIVE_NODE");
+    log("lider=" + id + "; difundiendo CURRENT_ACTIVE_NODE");
     for (int i = 0; i < nodos.size(); i++) {
       sendCommandTo(nodos.get(i), "CURRENT_ACTIVE_NODE|" + id);
     }
@@ -67,7 +67,7 @@ public class Monitor {
         }
       }
     }
-    logErr("elección fallida: ningún STANDBY aceptó START");
+    logErr("eleccion fallida: ningun STANDBY acepto START");
   }
 
   private String sendCommandTo(ServerAddress node, String command) {

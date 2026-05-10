@@ -96,7 +96,7 @@ public class Main {
         writer.println("OK");
       } catch (NumberFormatException e) {
         writer.println("ERROR|INVALID_LEADER");
-        logSrvErr("monitor: CURRENT_ACTIVE_NODE inválido");
+        logSrvErr("monitor: CURRENT_ACTIVE_NODE invalido");
       }
       return true;
     }
@@ -126,16 +126,16 @@ public class Main {
 
   private static void onCurrentActiveNodeAnnouncement(int leaderId) {
     if (leaderId == id) {
-      logSrv("cluster: confirmado como líder índice " + id);
+      logSrv("cluster: confirmado como lider indice " + id);
       stopReplicaClientSession();
       return;
     }
     if (leaderId < 0 || leaderId >= Environment.nodosServidores.size()) {
-      logSrvErr("CURRENT_ACTIVE_NODE: índice de líder inválido: " + leaderId);
+      logSrvErr("CURRENT_ACTIVE_NODE: indice de lider invalido: " + leaderId);
       return;
     }
     status = "standby";
-    logSrv("rol: pasivo — réplica hacia líder " + leaderId);
+    logSrv("rol: pasivo — replica hacia lider " + leaderId);
     startReplicaClientSessionIfNeeded(leaderId);
   }
 
@@ -195,7 +195,7 @@ public class Main {
       out.println("SUBSCRIBE_REPLICA");
       final String ack = in.readLine();
       if (ack == null || !ack.startsWith("OK|SUBSCRIBED")) {
-        logSrvErr("réplica: fallo suscripción al líder " + leaderId + " ACK=" + ack);
+        logSrvErr("replica: fallo suscripcion al lider " + leaderId + " ACK=" + ack);
         return;
       }
       String line;
@@ -217,7 +217,7 @@ public class Main {
               service.applyFullStateFromLeaderLine(line);
             }
           } catch (RuntimeException ex) {
-            logSrvErr("réplica: error aplicando STATE_FULL (" + ex.getMessage() + ")");
+            logSrvErr("replica: error aplicando STATE_FULL (" + ex.getMessage() + ")");
           }
         }
       }
@@ -225,7 +225,7 @@ public class Main {
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedException();
       }
-      logSrvErr("réplica: error de IO: " + e.getMessage());
+      logSrvErr("replica: error de IO: " + e.getMessage());
     }
   }
 

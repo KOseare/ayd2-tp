@@ -9,7 +9,7 @@ public class Turno {
   private final Timestamp registro;
   private EstadoTurno estado;
   private int nroLlamados;
-  private String estacion; // Id de la estación asignada al turno
+  private String estacion; // Id de la estacion asignada al turno
 
   public Turno(int id, Cliente cliente, Timestamp registro) {
     this.id = id;

@@ -34,7 +34,7 @@ public class ConexionServidor {
       if (response.toUpperCase().contains("OK")) {
         enc = true;
         activeId = i;
-        System.out.println("Se halló un nodo activo");
+        System.out.println("Se hallo un nodo activo");
       }
       i++;
     }
