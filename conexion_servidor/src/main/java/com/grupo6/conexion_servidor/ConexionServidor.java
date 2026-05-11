@@ -46,6 +46,11 @@ public class ConexionServidor {
       ensureInitialized();
       int tries = 1;
       while (!Thread.currentThread().isInterrupted()) {
+        if (activeId < 0 || activeId >= nodosServidores.size()) {
+          hallarNodoActivo();
+          sleepQuietly(2500);
+          continue;
+        }
         try {
           final ServerAddress addr = nodosServidores.get(activeId);
           socket = new Socket(addr.host, addr.port);
