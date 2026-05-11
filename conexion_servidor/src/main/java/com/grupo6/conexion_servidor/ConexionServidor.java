@@ -136,6 +136,7 @@ public class ConexionServidor {
       BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
       writer.println(msg);
       String response = reader.readLine();
+      socket.close();
       if (response == null) {
         return "ERROR|NO_RESPONSE";
       }

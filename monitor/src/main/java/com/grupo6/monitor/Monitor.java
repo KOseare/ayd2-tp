@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
 
@@ -12,6 +13,7 @@ import com.grupo6.environment.ServerAddress;
 
 public class Monitor {
   private final List<ServerAddress> nodos = Environment.nodosServidores;
+  private int port = Environment.monitorPort;
   private int activeNodeId = -1;
 
   private static void log(String message) {
@@ -24,6 +26,12 @@ public class Monitor {
 
   public void start() {
     log("iniciado; nodos=" + nodos.size());
+    try {
+      startServer();
+    } catch (IOException e) {
+      logErr("No se pudo iniciar el servidor.");
+      return;
+    }
     while (true) {
       if (activeNodeId < 0) {
         log("sin lider - eleccion");
@@ -36,6 +44,45 @@ public class Monitor {
         }
       }
       sleep();
+    }
+  }
+
+  private void startServer() throws IOException {
+    final Thread serverThread = new Thread(() -> {
+      try (final ServerSocket serverSocket = new ServerSocket(port)) {
+        log("Servidor escuchando en puerto " + port);
+        while (true) {
+          Socket socket = serverSocket.accept();
+          Thread clientThread = new Thread(() -> handleClient(socket), "server-client-handler");
+          clientThread.setDaemon(true);
+          clientThread.start();
+        }
+      } catch (IOException e) {
+        logErr("Error en ServerSocket: " + e.getMessage());
+      }
+    });
+    serverThread.setDaemon(true);
+    serverThread.start();
+  }
+
+  public void handleClient(Socket socket) {
+    try (Socket localSocket = socket;
+        BufferedReader reader = new BufferedReader(new InputStreamReader(localSocket.getInputStream()));
+        PrintWriter writer = new PrintWriter(localSocket.getOutputStream(), true)) {
+      final String message = reader.readLine();
+      log("request: " + message);
+      final String[] parts = message.trim().split("\\|");
+      final String command = parts[0];
+
+      if ("GET_ACTIVE_NODE".equals(command)) {
+        writer.println("OK|" + activeNodeId);
+        return;
+      }
+
+      writer.println("ERROR|UNKNOWN_COMMAND");
+
+    } catch (IOException e) {
+      logErr("handleClient: " + e.getMessage());
     }
   }
 

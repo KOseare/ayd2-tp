@@ -20,7 +20,10 @@ public class Main {
   private static final Object replicaLock = new Object();
   private static volatile Thread replicaWorker = null;
 
-  /** Prefix {@code [SERVIDOR-<id>-ACTIVO|STANDBY]} for stdout logs from {@link #logSrv}. */
+  /**
+   * Prefix {@code [SERVIDOR-<id>-ACTIVO|STANDBY]} for stdout logs from
+   * {@link #logSrv}.
+   */
   static String serverLogPrefix() {
     final String role = "ACTIVE".equalsIgnoreCase(status) ? "ACTIVO" : "STANDBY";
     final String nid = id >= 0 ? String.valueOf(id) : "?";
@@ -36,6 +39,9 @@ public class Main {
   }
 
   public static void main(String[] args) {
+    final Thread initialRequestThread = new Thread(() -> initialActiveNodeRequest());
+    initialRequestThread.setDaemon(true);
+    initialRequestThread.start();
     try {
       id = Integer.parseInt(args[0]);
       final ServerAddress addr = Environment.nodosServidores.get(id);
@@ -45,6 +51,40 @@ public class Main {
       final String pre = id >= 0 ? serverLogPrefix() : "[SERVIDOR-?-STANDBY]";
       System.err.println(pre + " No se pudo iniciar el servidor: " + e.getMessage());
     }
+  }
+
+  private static void initialActiveNodeRequest() {
+    int activeNodeId = -2;
+    while (activeNodeId == -2) {
+      try {
+        final int activeNodeResponse = getActiveNodeId();
+        if (activeNodeResponse < 0) {
+          activeNodeId = -1;
+          continue;
+        }
+        activeNodeId = activeNodeResponse;
+      } catch (Exception e) {
+        logSrvErr("No se pudo obtener el ID del nodo activo: " + e.getMessage());
+        sleepQuietly(750);
+      }
+    }
+    logSrv("Se obtuvo el ID del nodo activo: " + activeNodeId);
+    onCurrentActiveNodeAnnouncement(activeNodeId);
+  }
+
+  private static int getActiveNodeId() throws Exception {
+    final Socket socket = new Socket(Environment.monitorHost, Environment.monitorPort);
+    BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+    writer.println("GET_ACTIVE_NODE");
+    final String response = reader.readLine();
+    socket.close();
+    if (!response.startsWith("OK")) {
+      throw new Exception(response);
+    }
+    final String[] parts = response.split("\\|");
+    final int activeNodeIdResponse = Integer.parseInt(parts[1]);
+    return activeNodeIdResponse;
   }
 
   private static void startServer(int port, Controlador service) {
@@ -110,11 +150,6 @@ public class Main {
     }
     if (upper.contains("STATUS_UPDATE_REQUEST")) {
       writer.println(status.toUpperCase());
-      return true;
-    }
-    if (upper.contains("UPDATE_STATE")) {
-      // TODO: Update state
-      writer.println("OK");
       return true;
     }
     if (upper.contains("PING") && "ACTIVE".equalsIgnoreCase(status)) {
