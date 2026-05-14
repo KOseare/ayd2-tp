@@ -88,7 +88,10 @@ public class ConexionServidor {
   }
 
   public String sendCommand(String command) {
-    ensureInitialized();
+    final boolean initialized = ensureInitialized();
+    if (!initialized) {
+      return "ERROR|ACTIVE_NODE_NOT_FOUND";
+    }
     String response = sendCommandOneTry(command);
     int tries = 1;
     while (isServerFault(response) && tries < maxTries) {

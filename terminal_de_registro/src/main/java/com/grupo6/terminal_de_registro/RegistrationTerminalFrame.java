@@ -5,7 +5,6 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.Insets;
-import java.util.regex.Pattern;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -16,66 +15,14 @@ import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 
-import com.grupo6.conexion_servidor.ConexionServidor;
 import com.grupo6.ui.AppUiTheme;
 
-public class RegistrationTerminalFrame extends JFrame {
+public class RegistrationTerminalFrame extends JFrame implements IVista {
   private static final long serialVersionUID = 1L;
-  private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
-  private final ConexionServidor conexionServidor = new ConexionServidor();
+  private Controlador controlador = null;
   private final JTextField documentField;
   private final JLabel errorLabel;
-
-  private void registerClient() {
-    String dni = documentField.getText() == null ? "" : documentField.getText().trim();
-    if (dni.isEmpty()) {
-      showError("Error: el DNI es obligatorio.");
-      return;
-    }
-
-    if (!NUMERIC_PATTERN.matcher(dni).matches()) {
-      showError("Error: el DNI debe contener solo numeros.");
-      return;
-    }
-
-    if (dni.length() != 7 && dni.length() != 8) {
-      showError("Error: el DNI debe tener 7 u 8 digitos.");
-      return;
-    }
-
-    sendData(dni);
-  }
-
-  private void sendData(String dni) {
-    try {
-      final String response = conexionServidor.sendCommand("REGISTER|" + dni);
-      if (response == null) {
-        showError("Error: sin respuesta del servidor.");
-        return;
-      }
-
-      if (response.startsWith("OK|REGISTERED|")) {
-        documentField.setText("");
-        clearError();
-        return;
-      }
-
-      if ("ERROR|ALREADY_IN_QUEUE".equals(response) || "ERROR|ALREADY_IN_ATTENTION".equals(response)) {
-        showError("Error: el DNI ya existe en la fila.");
-        return;
-      }
-
-      if ("ERROR|INVALID_DNI".equals(response)) {
-        showError("Error: DNI invalido.");
-        return;
-      }
-
-      showError("Error del servidor: " + response);
-    } catch (Exception e) {
-      showError("Hubo un error: " + e.getMessage());
-    }
-  }
 
   private void showError(String message) {
     errorLabel.setText(message);
@@ -83,6 +30,10 @@ public class RegistrationTerminalFrame extends JFrame {
 
   private void clearError() {
     errorLabel.setText("");
+  }
+
+  private String getDocumentText() {
+    return documentField.getText() == null ? "" : documentField.getText().trim();
   }
 
   public RegistrationTerminalFrame() {
@@ -125,7 +76,7 @@ public class RegistrationTerminalFrame extends JFrame {
     JButton joinButton = new JButton("Registrarse");
     joinButton.setFont(base.deriveFont(Font.BOLD, 14f));
     joinButton.setMargin(new Insets(12, 28, 12, 28));
-    joinButton.addActionListener(e -> registerClient());
+    joinButton.addActionListener(e -> controlador.registrarse(getDocumentText()));
 
     JPanel footer = new JPanel(new BorderLayout(0, 12));
     footer.setOpaque(false);
@@ -149,5 +100,24 @@ public class RegistrationTerminalFrame extends JFrame {
     root.add(footer, BorderLayout.SOUTH);
 
     setContentPane(root);
+  }
+
+  @Override
+  public void setControlador(Controlador controlador) {
+    this.controlador = controlador;
+  }
+
+  @Override
+  public void actualizar(ModeloVista modelo) {
+    if (modelo.error == null) {
+      clearError();
+    } else {
+      showError(modelo.error);
+    }
+    if (modelo.dni == null) {
+      documentField.setText("");
+    } else {
+      documentField.setText(modelo.dni);
+    }
   }
 }
