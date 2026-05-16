@@ -19,16 +19,12 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
-import com.grupo6.conexion_servidor.ConexionServidor;
 import com.grupo6.ui.AppUiTheme;
 
-public class OperatorFrame extends JFrame {
-
+public class OperatorFrame extends JFrame implements IVista {
   private static final long serialVersionUID = 1L;
-  private static final int RENOTIFY_COOLDOWN_MS = 30_000;
-  private final ConexionServidor conexionServidor = new ConexionServidor();
 
-  private String stationId;
+  private Controlador controlador = null;
   private final JLabel stationLabel;
   private final JLabel queueCountLabel;
   private final JLabel lastCalledCaption;
@@ -39,13 +35,10 @@ public class OperatorFrame extends JFrame {
   private final JButton finalizeButton;
   private final Timer queueRefreshTimer;
   private final Timer buttonsRefreshTimer;
-  private long renotifyEnabledAtMs;
-  private String currentDni;
   private final Font activeDniFont;
   private final Font idleDniFont;
 
   public OperatorFrame() {
-    stationId = null;
     setTitle("Puesto de Operador");
     setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
     setMinimumSize(new Dimension(440, 400));
@@ -82,17 +75,20 @@ public class OperatorFrame extends JFrame {
     callNextButton = new JButton("Llamar Siguiente");
     callNextButton.setFont(base.deriveFont(Font.BOLD, 14f));
     callNextButton.setMargin(new Insets(12, 28, 12, 28));
-    callNextButton.addActionListener(e -> callNextClient());
+    callNextButton
+        .addActionListener(e -> controlador.callNextClient((runnable) -> SwingUtilities.invokeLater(runnable)));
 
     renotifyButton = new JButton("Re-notificar");
     renotifyButton.setFont(base.deriveFont(Font.BOLD, 14f));
     renotifyButton.setMargin(new Insets(12, 28, 12, 28));
-    renotifyButton.addActionListener(e -> renotifyClient());
+    renotifyButton
+        .addActionListener(e -> controlador.renotifyClient((runnable) -> SwingUtilities.invokeLater(runnable)));
 
     finalizeButton = new JButton("Finalizar Atencion");
     finalizeButton.setFont(base.deriveFont(Font.BOLD, 14f));
     finalizeButton.setMargin(new Insets(12, 28, 12, 28));
-    finalizeButton.addActionListener(e -> finalizeClient());
+    finalizeButton
+        .addActionListener(e -> controlador.finalizeClient((runnable) -> SwingUtilities.invokeLater(runnable)));
 
     JPanel hero = new JPanel(new BorderLayout(0, 10));
     hero.setBackground(AppUiTheme.BG_HERO);
@@ -125,194 +121,23 @@ public class OperatorFrame extends JFrame {
     root.add(footer, BorderLayout.SOUTH);
 
     setContentPane(root);
-    queueRefreshTimer = new Timer(3000, e -> refreshQueueCountAsync());
+    queueRefreshTimer = new Timer(3000,
+        e -> controlador.refreshQueueCountAsync((runnable) -> SwingUtilities.invokeLater(runnable)));
     queueRefreshTimer.start();
-    buttonsRefreshTimer = new Timer(1000, e -> updateButtonsState());
+    buttonsRefreshTimer = new Timer(1000, e -> controlador.cooldownUpdate());
     buttonsRefreshTimer.start();
     addWindowListener(new WindowAdapter() {
       @Override
       public void windowClosing(WindowEvent e) {
         queueRefreshTimer.stop();
         buttonsRefreshTimer.stop();
-        releaseStationId();
+        controlador.releaseStationId();
       }
     });
-    claimStationIdOrFail();
-    refreshQueueCountAsync();
-    updateButtonsState();
-    listenToQueueUpdates();
-  }
-
-  private void listenToQueueUpdates() {
-    conexionServidor.subscribeAndListen("SUBSCRIBE_OPERATOR", (String msg) -> handleUpdate(msg),
-        (String msg) -> handleError(msg));
-  }
-
-  private void handleUpdate(String msg) {
-    if (msg != null && msg.startsWith("OK|QUEUE_SIZE|")) {
-      String count = msg.substring("OK|QUEUE_SIZE|".length());
-      queueCountLabel.setText("Personas en cola: " + count);
-      return;
-    }
-    queueCountLabel.setText("Personas en cola: sin datos");
-  }
-
-  private void handleError(String msg) {
-    showError(msg);
-  }
-
-  private void callNextClient() {
-    if (stationId == null || stationId.isEmpty()) {
-      showError("Error: puesto no asignado.");
-      return;
-    }
-    runAsync(() -> {
-      String response = sendCommand("CALL_NEXT|" + stationId);
-      SwingUtilities.invokeLater(() -> handleCallNextResponse(response));
-    });
-  }
-
-  private void renotifyClient() {
-    if (stationId == null || stationId.isEmpty()) {
-      showError("Error: puesto no asignado.");
-      return;
-    }
-    runAsync(() -> {
-      String response = sendCommand("RENOTIFY|" + stationId);
-      SwingUtilities.invokeLater(() -> handleRenotifyResponse(response));
-    });
-  }
-
-  private void finalizeClient() {
-    if (stationId == null || stationId.isEmpty()) {
-      showError("Error: puesto no asignado.");
-      return;
-    }
-    runAsync(() -> {
-      String response = sendCommand("FINALIZE|" + stationId);
-      SwingUtilities.invokeLater(() -> handleFinalizeResponse(response));
-    });
-  }
-
-  private String sendCommand(String command) {
-    try {
-      return conexionServidor.sendCommand(command);
-    } catch (Exception e) {
-      // TODO: Verificar mensaje de error (ya no es IOException ya que se atrapa
-      // dentro de conexionServidor)
-      return "ERROR|NETWORK|" + e.getMessage();
-    }
-  }
-
-  private void refreshQueueCountAsync() {
-    runAsync(() -> {
-      String response = sendCommand("GET_QUEUE_SIZE");
-      SwingUtilities.invokeLater(() -> applyQueueCountResponse(response));
-    });
-  }
-
-  private void applyQueueCountResponse(String response) {
-    if (response != null && response.startsWith("OK|QUEUE_SIZE|")) {
-      String count = response.substring("OK|QUEUE_SIZE|".length());
-      queueCountLabel.setText("Personas en cola: " + count);
-      return;
-    }
-    queueCountLabel.setText("Personas en cola: sin datos");
-  }
-
-  private void handleCallNextResponse(String response) {
-    if (response.startsWith("OK|CALLED|")) {
-      currentDni = response.substring("OK|CALLED|".length());
-      lastCalledDniLabel.setText(currentDni);
-      lastCalledDniLabel.setFont(activeDniFont);
-      clearError();
-      scheduleRenotifyCooldown();
-      refreshQueueCountAsync();
-      updateButtonsState();
-      return;
-    }
-    if ("OK|NO_PENDING".equals(response)) {
-      currentDni = null;
-      clearRenotifyCooldown();
-      lastCalledDniLabel.setText("Sin cliente en atencion");
-      lastCalledDniLabel.setFont(idleDniFont);
-      clearError();
-      refreshQueueCountAsync();
-      updateButtonsState();
-      return;
-    }
-    if (response.startsWith("ERROR|NO_PENDING_KEEPING_CURRENT|")) {
-      String activeDni = response.substring("ERROR|NO_PENDING_KEEPING_CURRENT|".length());
-      currentDni = activeDni;
-      lastCalledDniLabel.setText(activeDni);
-      lastCalledDniLabel.setFont(activeDniFont);
-      clearError();
-      refreshQueueCountAsync();
-      updateButtonsState();
-      return;
-    }
-    showError("Error al llamar siguiente: " + response);
-  }
-
-  private void handleRenotifyResponse(String response) {
-    if (response.startsWith("OK|RENOTIFIED|")) {
-      String[] parts = response.split("\\|");
-      if (parts.length >= 4) {
-        currentDni = parts[2];
-        clearError();
-      } else {
-        clearError();
-      }
-      scheduleRenotifyCooldown();
-      refreshQueueCountAsync();
-      updateButtonsState();
-      return;
-    }
-    if (response.startsWith("OK|REMOVED_BY_LIMIT|")) {
-      currentDni = null;
-      clearRenotifyCooldown();
-      lastCalledDniLabel.setText("Sin cliente en atencion");
-      lastCalledDniLabel.setFont(idleDniFont);
-      clearError();
-      refreshQueueCountAsync();
-      updateButtonsState();
-      return;
-    }
-    if ("ERROR|NO_ACTIVE_CLIENT".equals(response)) {
-      currentDni = null;
-      clearRenotifyCooldown();
-      lastCalledDniLabel.setText("Sin cliente en atencion");
-      lastCalledDniLabel.setFont(idleDniFont);
-      clearError();
-      refreshQueueCountAsync();
-      updateButtonsState();
-      return;
-    }
-    showError("Error al re-notificar: " + response);
-  }
-
-  private void handleFinalizeResponse(String response) {
-    if (response.startsWith("OK|FINALIZED|")) {
-      currentDni = null;
-      clearRenotifyCooldown();
-      lastCalledDniLabel.setText("Sin cliente en atencion");
-      lastCalledDniLabel.setFont(idleDniFont);
-      clearError();
-      refreshQueueCountAsync();
-      updateButtonsState();
-      return;
-    }
-    if ("ERROR|NO_ACTIVE_CLIENT".equals(response)) {
-      currentDni = null;
-      clearRenotifyCooldown();
-      lastCalledDniLabel.setText("Sin cliente en atencion");
-      lastCalledDniLabel.setFont(idleDniFont);
-      clearError();
-      refreshQueueCountAsync();
-      updateButtonsState();
-      return;
-    }
-    showError("Error al finalizar: " + response);
+    controlador.claimStationIdOrFail(() -> requestStationIdOrFail());
+    controlador.refreshQueueCountAsync((runnable) -> SwingUtilities.invokeLater(runnable));
+    controlador.cooldownUpdate();
+    controlador.subscribirse();
   }
 
   private void showError(String message) {
@@ -323,20 +148,9 @@ public class OperatorFrame extends JFrame {
     errorLabel.setText("");
   }
 
-  private void scheduleRenotifyCooldown() {
-    renotifyEnabledAtMs = System.currentTimeMillis() + RENOTIFY_COOLDOWN_MS;
-  }
-
-  private void clearRenotifyCooldown() {
-    renotifyEnabledAtMs = 0L;
-  }
-
-  private void updateButtonsState() {
-    boolean hasCurrent = currentDni != null && !currentDni.isEmpty();
-    long now = System.currentTimeMillis();
-    boolean renotifyOk = hasCurrent && (renotifyEnabledAtMs == 0L || now >= renotifyEnabledAtMs);
-    renotifyButton.setEnabled(renotifyOk);
-    finalizeButton.setEnabled(hasCurrent);
+  private void updateButtonsState(boolean renotifyEnabled, boolean finalizeEnabled) {
+    renotifyButton.setEnabled(renotifyEnabled);
+    finalizeButton.setEnabled(finalizeEnabled);
   }
 
   private String requestStationIdOrFail() {
@@ -358,35 +172,33 @@ public class OperatorFrame extends JFrame {
     }
   }
 
-  private void claimStationIdOrFail() {
-    while (true) {
-      String requestedStation = requestStationIdOrFail();
-      String response = sendCommand("CLAIM_STATION|" + requestedStation);
-      if (response.startsWith("OK|STATION_CLAIMED|")) {
-        stationId = requestedStation;
-        stationLabel.setText("Puesto: " + stationId);
-        clearError();
-        return;
-      }
-      if ("ERROR|STATION_ID_EXISTS".equals(response)) {
-        showError("Error: el Puesto ID ya existe.");
-        continue;
-      }
-      showError("Error al registrar puesto: " + response);
+  @Override
+  public void setControlador(Controlador controlador) {
+    this.controlador = controlador;
+  }
+
+  @Override
+  public void actualizar(ModeloVista modelo) {
+    if (modelo.currentDni != null) {
+      lastCalledDniLabel.setText(modelo.currentDni);
+      lastCalledDniLabel.setFont(activeDniFont);
+    } else {
+      lastCalledDniLabel.setText("Sin cliente en atención");
+      lastCalledDniLabel.setFont(idleDniFont);
     }
-  }
-
-  private void releaseStationId() {
-    if (stationId == null || stationId.isEmpty()) {
-      return;
+    if (modelo.error == null) {
+      clearError();
+    } else {
+      showError(modelo.error);
     }
-    sendCommand("RELEASE_STATION|" + stationId);
+    if (modelo.personasEnCola >= 0) {
+      queueCountLabel.setText("Personas en cola: " + modelo.personasEnCola);
+    } else {
+      queueCountLabel.setText("Personas en cola: sin datos");
+    }
+    if (modelo.stationId != null) {
+      stationLabel.setText("Puesto: " + modelo.stationId);
+    }
+    updateButtonsState(modelo.renotifyBtnEnabled, modelo.finalizeBtnEnabled);
   }
-
-  private void runAsync(Runnable action) {
-    Thread thread = new Thread(action, "operator-action-thread");
-    thread.setDaemon(true);
-    thread.start();
-  }
-
 }
