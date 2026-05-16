@@ -204,6 +204,8 @@ public class Controlador {
   public void handleRenotifyResponse(String response, InvokeLaterCallback invokeLater) {
     if (response.startsWith("OK|RENOTIFIED|")) {
       String[] parts = response.split("\\|");
+      scheduleRenotifyCooldown();
+      refreshQueueCountAsync(invokeLater);
       if (parts.length >= 4) {
         modelo = new ModeloVista(modelo.personasEnCola, null, modelo.stationId, parts[2], renotifyEnabled(),
             finalizeEnabled());
@@ -214,11 +216,10 @@ public class Controlador {
             finalizeEnabled());
         vista.actualizar(modelo);
       }
-      scheduleRenotifyCooldown();
-      refreshQueueCountAsync(invokeLater);
       return;
     }
     if (response.startsWith("OK|REMOVED_BY_LIMIT|")) {
+      // TODO: Revisar notas de revisión y quitar esto como corresponda
       modelo = new ModeloVista(modelo.personasEnCola, null, modelo.stationId, null, renotifyEnabled(),
           finalizeEnabled());
       vista.actualizar(modelo);
