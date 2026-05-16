@@ -24,7 +24,6 @@ import com.grupo6.ui.AppUiTheme;
 public class OperatorFrame extends JFrame implements IVista {
   private static final long serialVersionUID = 1L;
 
-  private Controlador controlador = null;
   private final JLabel stationLabel;
   private final JLabel queueCountLabel;
   private final JLabel lastCalledCaption;
@@ -33,8 +32,8 @@ public class OperatorFrame extends JFrame implements IVista {
   private final JButton callNextButton;
   private final JButton renotifyButton;
   private final JButton finalizeButton;
-  private final Timer queueRefreshTimer;
-  private final Timer buttonsRefreshTimer;
+  private Timer queueRefreshTimer = null;
+  private Timer buttonsRefreshTimer = null;
   private final Font activeDniFont;
   private final Font idleDniFont;
 
@@ -75,20 +74,14 @@ public class OperatorFrame extends JFrame implements IVista {
     callNextButton = new JButton("Llamar Siguiente");
     callNextButton.setFont(base.deriveFont(Font.BOLD, 14f));
     callNextButton.setMargin(new Insets(12, 28, 12, 28));
-    callNextButton
-        .addActionListener(e -> controlador.callNextClient((runnable) -> SwingUtilities.invokeLater(runnable)));
 
     renotifyButton = new JButton("Re-notificar");
     renotifyButton.setFont(base.deriveFont(Font.BOLD, 14f));
     renotifyButton.setMargin(new Insets(12, 28, 12, 28));
-    renotifyButton
-        .addActionListener(e -> controlador.renotifyClient((runnable) -> SwingUtilities.invokeLater(runnable)));
 
     finalizeButton = new JButton("Finalizar Atencion");
     finalizeButton.setFont(base.deriveFont(Font.BOLD, 14f));
     finalizeButton.setMargin(new Insets(12, 28, 12, 28));
-    finalizeButton
-        .addActionListener(e -> controlador.finalizeClient((runnable) -> SwingUtilities.invokeLater(runnable)));
 
     JPanel hero = new JPanel(new BorderLayout(0, 10));
     hero.setBackground(AppUiTheme.BG_HERO);
@@ -121,23 +114,6 @@ public class OperatorFrame extends JFrame implements IVista {
     root.add(footer, BorderLayout.SOUTH);
 
     setContentPane(root);
-    queueRefreshTimer = new Timer(3000,
-        e -> controlador.refreshQueueCountAsync((runnable) -> SwingUtilities.invokeLater(runnable)));
-    queueRefreshTimer.start();
-    buttonsRefreshTimer = new Timer(1000, e -> controlador.cooldownUpdate());
-    buttonsRefreshTimer.start();
-    addWindowListener(new WindowAdapter() {
-      @Override
-      public void windowClosing(WindowEvent e) {
-        queueRefreshTimer.stop();
-        buttonsRefreshTimer.stop();
-        controlador.releaseStationId();
-      }
-    });
-    controlador.claimStationIdOrFail(() -> requestStationIdOrFail());
-    controlador.refreshQueueCountAsync((runnable) -> SwingUtilities.invokeLater(runnable));
-    controlador.cooldownUpdate();
-    controlador.subscribirse();
   }
 
   private void showError(String message) {
@@ -174,7 +150,29 @@ public class OperatorFrame extends JFrame implements IVista {
 
   @Override
   public void setControlador(Controlador controlador) {
-    this.controlador = controlador;
+    callNextButton
+        .addActionListener(e -> controlador.callNextClient((runnable) -> SwingUtilities.invokeLater(runnable)));
+    renotifyButton
+        .addActionListener(e -> controlador.renotifyClient((runnable) -> SwingUtilities.invokeLater(runnable)));
+    finalizeButton
+        .addActionListener(e -> controlador.finalizeClient((runnable) -> SwingUtilities.invokeLater(runnable)));
+    queueRefreshTimer = new Timer(3000,
+        e -> controlador.refreshQueueCountAsync((runnable) -> SwingUtilities.invokeLater(runnable)));
+    queueRefreshTimer.start();
+    buttonsRefreshTimer = new Timer(1000, e -> controlador.cooldownUpdate());
+    buttonsRefreshTimer.start();
+    addWindowListener(new WindowAdapter() {
+      @Override
+      public void windowClosing(WindowEvent e) {
+        queueRefreshTimer.stop();
+        buttonsRefreshTimer.stop();
+        controlador.releaseStationId();
+      }
+    });
+    controlador.claimStationIdOrFail(() -> requestStationIdOrFail());
+    controlador.refreshQueueCountAsync((runnable) -> SwingUtilities.invokeLater(runnable));
+    controlador.cooldownUpdate();
+    controlador.subscribirse();
   }
 
   @Override
