@@ -25,6 +25,8 @@ public class Controlador {
       String count = msg.substring("OK|QUEUE_SIZE|".length());
       modelo = new ModeloVista(Integer.parseInt(count), modelo.error, modelo.stationId, modelo.currentDni,
           modelo.renotifyBtnEnabled, modelo.finalizeBtnEnabled);
+      vista.actualizar(modelo);
+      return;
     }
     modelo = new ModeloVista(-1, modelo.error, modelo.stationId, modelo.currentDni, modelo.renotifyBtnEnabled,
         modelo.finalizeBtnEnabled);

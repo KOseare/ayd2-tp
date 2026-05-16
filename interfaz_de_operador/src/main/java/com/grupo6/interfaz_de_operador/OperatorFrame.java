@@ -164,6 +164,7 @@ public class OperatorFrame extends JFrame implements IVista {
     addWindowListener(new WindowAdapter() {
       @Override
       public void windowClosing(WindowEvent e) {
+        // No se invoca si se cierra con CTRL+C desde la terminal
         queueRefreshTimer.stop();
         buttonsRefreshTimer.stop();
         controlador.releaseStationId();
