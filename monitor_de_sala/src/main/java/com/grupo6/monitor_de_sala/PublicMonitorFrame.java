@@ -8,7 +8,6 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
@@ -22,20 +21,17 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
-import com.grupo6.conexion_servidor.ConexionServidor;
 import com.grupo6.ui.AppUiTheme;
 
-public class PublicMonitorFrame extends JFrame {
+public class PublicMonitorFrame extends JFrame implements IVista {
 
   private static final long serialVersionUID = 1L;
   private static final int HISTORY_LIMIT = 5;
-  private final ConexionServidor conexionServidor = new ConexionServidor();
 
   private final JLabel currentTurnLabel;
   private final JLabel currentStationLabel;
   private final JLabel errorLabel;
   private final List<JLabel> historyRows = new ArrayList<>();
-  private final Deque<String> callHistory = new ArrayDeque<>();
   private final Font historyFont;
 
   public PublicMonitorFrame() {
@@ -114,7 +110,6 @@ public class PublicMonitorFrame extends JFrame {
     root.add(south, BorderLayout.SOUTH);
 
     setContentPane(root);
-    startMonitorClient();
   }
 
   private static JLabel historyRow(String doc, Font font) {
@@ -127,74 +122,6 @@ public class PublicMonitorFrame extends JFrame {
         BorderFactory.createLineBorder(AppUiTheme.BORDER_CARD, 1),
         BorderFactory.createEmptyBorder(8, 12, 8, 12)));
     return row;
-  }
-
-  private void startMonitorClient() {
-    conexionServidor.subscribeAndListen("SUBSCRIBE_MONITOR",
-        (String msg) -> {
-          SwingUtilities.invokeLater(() -> handleEvent(msg));
-        }, (String err) -> {
-          SwingUtilities.invokeLater(() -> showError(err));
-        });
-  }
-
-  private void handleEvent(String eventLine) {
-    String[] parts = eventLine.split("\\|");
-    if (parts.length < 2 || !"EVENT".equals(parts[0])) {
-      showError("Error: mensaje no valido");
-      return;
-    }
-
-    if ("CALL".equals(parts[1]) && parts.length >= 4) {
-      String dni = parts[2];
-      String stationId = parts[3];
-      updateTurn(dni, stationId);
-      clearError();
-      return;
-    }
-
-    if ("RENOTIFY".equals(parts[1]) && parts.length >= 5) {
-      String dni = parts[2];
-      String stationId = parts[3];
-      updateCurrentTurnOnly(dni, stationId);
-      runPriorityBlink();
-      clearError();
-      return;
-    }
-
-    if ("REMOVED".equals(parts[1]) && parts.length >= 4) {
-      updateCurrentTurnOnly("-", "-");
-      clearError();
-      return;
-    }
-
-    if ("FINALIZED".equals(parts[1]) && parts.length >= 4) {
-      clearError();
-      return;
-    }
-
-    showError("Error: evento no soportado");
-  }
-
-  private void updateTurn(String dni, String stationId) {
-    String rowText = dni + " - Puesto " + stationId;
-    callHistory.addFirst(rowText);
-    while (callHistory.size() > HISTORY_LIMIT) {
-      callHistory.removeLast();
-    }
-
-    currentTurnLabel.setText(dni);
-    currentStationLabel.setText("Puesto ID: " + stationId);
-
-    int index = 0;
-    for (String value : callHistory) {
-      historyRows.get(index).setText(value);
-      index++;
-    }
-    while (index < HISTORY_LIMIT) {
-      historyRows.get(index).setText("-");
-      index++;
-    }
   }
 
   private void updateCurrentTurnOnly(String dni, String stationId) {
@@ -233,5 +160,40 @@ public class PublicMonitorFrame extends JFrame {
       }
     });
     timer.start();
+  }
+
+  private void updateCallHistory(Deque<String> callHistory) {
+    int index = 0;
+    for (String value : callHistory) {
+      historyRows.get(index).setText(value);
+      index++;
+    }
+    while (index < HISTORY_LIMIT) {
+      historyRows.get(index).setText("-");
+      index++;
+    }
+  }
+
+  @Override
+  public void setControlador(Controlador controlador) {
+    controlador.startMonitorClient((runnable) -> SwingUtilities.invokeLater(runnable));
+  }
+
+  @Override
+  public void actualizar(ModeloVista modelo) {
+    if (modelo.runPriorityBlink) {
+      runPriorityBlink();
+    }
+    if (modelo.idPuestoTurnoActual != null && modelo.dniTurnoActual != null) {
+      updateCurrentTurnOnly(modelo.dniTurnoActual, modelo.idPuestoTurnoActual);
+    }
+    if (modelo.error == null) {
+      clearError();
+    } else {
+      showError(modelo.error);
+    }
+    if (modelo.historialDeLlamadas != null) {
+      updateCallHistory(modelo.historialDeLlamadas);
+    }
   }
 }
