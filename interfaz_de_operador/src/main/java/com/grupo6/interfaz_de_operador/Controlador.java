@@ -244,7 +244,7 @@ public class Controlador {
       String mensajeCentro = "Cliente Ausente";
       modelo = new ModeloVista(
           modelo.personasEnCola,
-          "El cliente superó el máximo de 3 llamados y fue removido de la fila.",
+          "El cliente supero el maximo de 3 llamados y fue removido de la fila.",
           modelo.stationId,
           mensajeCentro,
           false,

@@ -57,7 +57,7 @@ public class Controlador {
       }
 
       if (response == "ERROR|ACTIVE_NODE_NOT_FOUND") {
-        return "Error: no se pudo establecer una conexión con el servidor.";
+        return "Error: no se pudo establecer una conexion con el servidor.";
       }
 
       if (response.startsWith("OK|REGISTERED|")) {

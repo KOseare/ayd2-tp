@@ -21,7 +21,7 @@ public class MonitorFrame extends JFrame implements IVista {
   private final Font baseFont;
 
   public MonitorFrame() {
-    setTitle("Monitor de Infraestructura - Clúster de Servidores");
+    setTitle("Monitor de Infraestructura");
     setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
     setMinimumSize(new Dimension(520, 450));
     setSize(560, 500);
@@ -29,11 +29,11 @@ public class MonitorFrame extends JFrame implements IVista {
 
     baseFont = AppUiTheme.baseUiFont();
 
-    JLabel titleLabel = new JLabel("ESTADO DEL CLÚSTER", SwingConstants.CENTER);
+    JLabel titleLabel = new JLabel("ESTADO DE LOS SERVIDORES", SwingConstants.CENTER);
     titleLabel.setFont(baseFont.deriveFont(Font.BOLD, 12f));
     titleLabel.setForeground(AppUiTheme.TEXT_MUTED);
 
-    leaderLabel = new JLabel("Servidor Principal: Buscando líder...", SwingConstants.CENTER);
+    leaderLabel = new JLabel("Servidor Principal: Buscando lider...", SwingConstants.CENTER);
     leaderLabel.setFont(baseFont.deriveFont(Font.BOLD, 20f));
     leaderLabel.setForeground(AppUiTheme.TEXT_HERO_DNI);
 
@@ -69,7 +69,7 @@ public class MonitorFrame extends JFrame implements IVista {
     if (modelo.activeNodeId >= 0) {
       leaderLabel.setText("Servidor Principal Activo: Nodo " + modelo.activeNodeId);
     } else {
-      leaderLabel.setText("Servidor Principal: SIN LÍDER (Elección en progreso)");
+      leaderLabel.setText("Servidor Principal: SIN LIDER (Eleccion en progreso)");
     }
 
     nodesContainer.removeAll();
