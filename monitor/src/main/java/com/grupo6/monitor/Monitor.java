@@ -4,10 +4,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
-
 import com.grupo6.environment.Environment;
 import com.grupo6.environment.ServerAddress;
 
@@ -15,6 +16,7 @@ public class Monitor {
   private final List<ServerAddress> nodos = Environment.nodosServidores;
   private int port = Environment.monitorPort;
   private int activeNodeId = -1;
+  private Controlador controlador;
 
   private static void log(String message) {
     System.out.println("[MONITOR] " + message);
@@ -22,6 +24,10 @@ public class Monitor {
 
   private static void logErr(String message) {
     System.err.println("[MONITOR] " + message);
+  }
+
+  public void setControlador(Controlador controlador) {
+    this.controlador = controlador;
   }
 
   public void start() {
@@ -33,6 +39,7 @@ public class Monitor {
       return;
     }
     while (true) {
+      pushClusterStateToUi();
       if (activeNodeId < 0) {
         log("sin lider - eleccion");
         selectNewActiveNode();
@@ -45,6 +52,38 @@ public class Monitor {
       }
       sleep();
     }
+  }
+
+  private void pushClusterStateToUi() {
+    if (controlador == null) {
+      return;
+    }
+    List<String> nombres = new ArrayList<>();
+    List<String> estados = new ArrayList<>();
+
+    for (int i = 0; i < nodos.size(); i++) {
+      ServerAddress addr = nodos.get(i);
+      nombres.add("Nodo " + i + " (" + addr.host + ":" + addr.port + ")");
+
+      if (i == activeNodeId) {
+        String response = sendCommandTo(addr, "PING");
+        if (response.toUpperCase().contains("OK")) {
+          estados.add("ACTIVE");
+        } else {
+          estados.add("DOWN");
+        }
+      } else {
+        String response = sendCommandTo(addr, "STATUS_UPDATE_REQUEST");
+        if (response.toUpperCase().contains("STANDBY")) {
+          estados.add("STANDBY");
+        } else if (response.toUpperCase().contains("ACTIVE")) {
+          estados.add("ACTIVE");
+        } else {
+          estados.add("DOWN");
+        }
+      }
+    }
+    controlador.actualizarEstado(new ModeloVista(activeNodeId, nombres, estados));
   }
 
   private void startServer() throws IOException {
@@ -119,7 +158,9 @@ public class Monitor {
 
   private String sendCommandTo(ServerAddress node, String command) {
     try {
-      final Socket socket = new Socket(node.host, node.port);
+      final Socket socket = new Socket();
+      socket.connect(new InetSocketAddress(node.host, node.port), 1000);
+      socket.setSoTimeout(1000);
       PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
       BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
       writer.println(command);
@@ -130,7 +171,6 @@ public class Monitor {
       }
       return response;
     } catch (IOException e) {
-      logErr("error red hacia " + node.host + ":" + node.port + " - " + e.getMessage());
       return "ERROR|NETWORK|" + e.getMessage();
     }
   }

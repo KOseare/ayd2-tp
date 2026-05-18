@@ -23,7 +23,11 @@ public class Controlador {
   private void handleUpdate(String msg) {
     if (msg != null && msg.startsWith("OK|QUEUE_SIZE|")) {
       String count = msg.substring("OK|QUEUE_SIZE|".length());
-      modelo = new ModeloVista(Integer.parseInt(count), modelo.error, modelo.stationId, modelo.currentDni,
+      int personas = Integer.parseInt(count);
+    
+      String error = (personas > 0 && modelo.error != null && modelo.error.contains("No hay clientes pendientes en la cola.")) ? null : modelo.error;
+
+      modelo = new ModeloVista(Integer.parseInt(count), error, modelo.stationId, modelo.currentDni,
           modelo.renotifyBtnEnabled, modelo.finalizeBtnEnabled);
       vista.actualizar(modelo);
       return;
@@ -46,6 +50,13 @@ public class Controlador {
       vista.actualizar(modelo);
       return;
     }
+
+    if (modelo.personasEnCola > 0 && modelo.error != null && modelo.error.contains("No hay clientes pendientes en la cola.")) {
+      modelo = new ModeloVista(modelo.personasEnCola, null, modelo.stationId, 
+          modelo.currentDni, modelo.renotifyBtnEnabled, modelo.finalizeBtnEnabled);
+      vista.actualizar(modelo);
+    }
+
     runAsync(() -> {
       String response = conexionServidor.sendCommand("CALL_NEXT|" + modelo.stationId);
       invokeLater.invokeLater(() -> handleCallNextResponse(response, invokeLater));
@@ -81,7 +92,7 @@ public class Controlador {
   private void handleCallNextResponse(String response, InvokeLaterCallback invokeLater) {
     if (response.startsWith("OK|CALLED|")) {
       final String currentDni = response.substring("OK|CALLED|".length());
-      modelo = new ModeloVista(modelo.personasEnCola, null, modelo.stationId, currentDni, renotifyEnabled(),
+      modelo = new ModeloVista(modelo.personasEnCola, "No hay clientes pendientes en la cola.", modelo.stationId, currentDni, renotifyEnabled(),
           finalizeEnabled());
       vista.actualizar(modelo);
       scheduleRenotifyCooldown();
@@ -89,7 +100,7 @@ public class Controlador {
       return;
     }
     if ("OK|NO_PENDING".equals(response)) {
-      modelo = new ModeloVista(modelo.personasEnCola, null, modelo.stationId, null, renotifyEnabled(),
+      modelo = new ModeloVista(modelo.personasEnCola, "No hay clientes pendientes en la cola.", modelo.stationId, null, renotifyEnabled(),
           finalizeEnabled());
       vista.actualizar(modelo);
       clearRenotifyCooldown();
@@ -161,7 +172,11 @@ public class Controlador {
   private void applyQueueCountResponse(String response) {
     if (response != null && response.startsWith("OK|QUEUE_SIZE|")) {
       String count = response.substring("OK|QUEUE_SIZE|".length());
-      modelo = new ModeloVista(Integer.parseInt(count), modelo.error, modelo.stationId, modelo.currentDni,
+      int personas = Integer.parseInt(count);
+    
+      String error = (personas > 0 && modelo.error != null && modelo.error.contains("No hay clientes pendientes en la cola.")) ? null : modelo.error;
+
+      modelo = new ModeloVista(Integer.parseInt(count), error, modelo.stationId, modelo.currentDni,
           modelo.renotifyBtnEnabled, modelo.finalizeBtnEnabled);
       vista.actualizar(modelo);
       return;
@@ -182,7 +197,7 @@ public class Controlador {
         return;
       }
       if ("ERROR|STATION_ID_EXISTS".equals(response)) {
-        modelo = new ModeloVista(modelo.personasEnCola, "Error: el Puesto ID ya existe.", modelo.stationId,
+        modelo = new ModeloVista(modelo.personasEnCola, "Error: el puesto '" + requestedStation + "' ya existe.", modelo.stationId,
             modelo.currentDni,
             modelo.renotifyBtnEnabled, modelo.finalizeBtnEnabled);
         vista.actualizar(modelo);
@@ -219,9 +234,16 @@ public class Controlador {
       return;
     }
     if (response.startsWith("OK|REMOVED_BY_LIMIT|")) {
-      // TODO: Revisar notas de revisión y quitar esto como corresponda
-      modelo = new ModeloVista(modelo.personasEnCola, null, modelo.stationId, null, renotifyEnabled(),
-          finalizeEnabled());
+      String mensajeCentro = "Cliente Ausente";
+      modelo = new ModeloVista(
+          modelo.personasEnCola, 
+          "El cliente superó el máximo de 3 llamados y fue removido de la fila.", 
+          modelo.stationId, 
+          mensajeCentro, 
+          false, 
+          false
+      );
+      
       vista.actualizar(modelo);
       clearRenotifyCooldown();
       refreshQueueCountAsync(invokeLater);

@@ -130,6 +130,15 @@ public class OperatorFrame extends JFrame implements IVista {
   }
 
   private String requestStationIdOrFail() {
+    if (!errorLabel.getText().isEmpty()) {
+      JOptionPane.showMessageDialog(
+          null,
+          errorLabel.getText(),
+          "Puesto Duplicado",
+          JOptionPane.WARNING_MESSAGE);
+      clearError();
+    }
+
     while (true) {
       String input = JOptionPane.showInputDialog(
           null,
