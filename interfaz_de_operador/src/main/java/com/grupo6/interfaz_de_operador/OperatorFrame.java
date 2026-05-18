@@ -130,6 +130,15 @@ public class OperatorFrame extends JFrame implements IVista {
   }
 
   private String requestStationIdOrFail() {
+    if (!errorLabel.getText().isEmpty()) {
+      JOptionPane.showMessageDialog(
+          null,
+          errorLabel.getText(),
+          "Puesto Duplicado",
+          JOptionPane.WARNING_MESSAGE);
+      clearError();
+    }
+
     while (true) {
       String input = JOptionPane.showInputDialog(
           null,
@@ -182,7 +191,7 @@ public class OperatorFrame extends JFrame implements IVista {
       lastCalledDniLabel.setText(modelo.currentDni);
       lastCalledDniLabel.setFont(activeDniFont);
     } else {
-      lastCalledDniLabel.setText("Sin cliente en atención");
+      lastCalledDniLabel.setText("Sin cliente en atencion");
       lastCalledDniLabel.setFont(idleDniFont);
     }
     if (modelo.error == null) {

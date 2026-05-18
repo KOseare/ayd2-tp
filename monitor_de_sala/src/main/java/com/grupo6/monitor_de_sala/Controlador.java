@@ -52,7 +52,7 @@ public class Controlador {
     }
 
     if ("REMOVED".equals(parts[1]) && parts.length >= 4) {
-      updateCurrentTurnOnly("-", "-");
+      // updateCurrentTurnOnly("-", "-");
       clearError();
       return;
     }
