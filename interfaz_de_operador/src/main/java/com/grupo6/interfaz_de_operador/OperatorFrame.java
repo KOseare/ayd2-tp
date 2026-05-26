@@ -20,6 +20,8 @@ import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
 import com.grupo6.conexion_servidor.ConexionServidor;
+import com.grupo6.security.AESEncryptionStrategy;
+import com.grupo6.security.EncryptionStrategy;
 import com.grupo6.ui.AppUiTheme;
 
 public class OperatorFrame extends JFrame {
@@ -27,6 +29,7 @@ public class OperatorFrame extends JFrame {
   private static final long serialVersionUID = 1L;
   private static final int RENOTIFY_COOLDOWN_MS = 30_000;
   private final ConexionServidor conexionServidor = new ConexionServidor();
+  private final EncryptionStrategy encryptionStrategy;
 
   private String stationId;
   private final JLabel stationLabel;
@@ -45,6 +48,11 @@ public class OperatorFrame extends JFrame {
   private final Font idleDniFont;
 
   public OperatorFrame() {
+    this(new AESEncryptionStrategy());
+  }
+
+  public OperatorFrame(EncryptionStrategy encryptionStrategy) {
+    this.encryptionStrategy = encryptionStrategy;
     stationId = null;
     setTitle("Puesto de Operador");
     setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
@@ -145,7 +153,11 @@ public class OperatorFrame extends JFrame {
 
   private void listenToQueueUpdates() {
     conexionServidor.subscribeAndListen("SUBSCRIBE_OPERATOR", (String msg) -> handleUpdate(msg),
-        (String msg) -> handleError(msg));
+        (String msg) -> {
+          SwingUtilities.invokeLater(() -> handleConnectionError(msg));
+        }, (String msg) -> {
+          SwingUtilities.invokeLater(() -> handleConnectionReady());
+        });
   }
 
   private void handleUpdate(String msg) {
@@ -157,8 +169,19 @@ public class OperatorFrame extends JFrame {
     queueCountLabel.setText("Personas en cola: sin datos");
   }
 
-  private void handleError(String msg) {
+  private void handleConnectionError(String msg) {
+    currentDni = null;
+    clearRenotifyCooldown();
+    queueCountLabel.setText("Personas en cola: sin datos");
+    lastCalledDniLabel.setText("Sin cliente en atencion");
+    lastCalledDniLabel.setFont(idleDniFont);
+    updateButtonsState();
     showError(msg);
+  }
+
+  private void handleConnectionReady() {
+    clearError();
+    refreshQueueCountAsync();
   }
 
   private void callNextClient() {
@@ -222,7 +245,10 @@ public class OperatorFrame extends JFrame {
 
   private void handleCallNextResponse(String response) {
     if (response.startsWith("OK|CALLED|")) {
-      currentDni = response.substring("OK|CALLED|".length());
+      currentDni = decryptDniForDisplay(response.substring("OK|CALLED|".length()));
+      if (currentDni.isEmpty()) {
+        return;
+      }
       lastCalledDniLabel.setText(currentDni);
       lastCalledDniLabel.setFont(activeDniFont);
       clearError();
@@ -242,7 +268,10 @@ public class OperatorFrame extends JFrame {
       return;
     }
     if (response.startsWith("ERROR|NO_PENDING_KEEPING_CURRENT|")) {
-      String activeDni = response.substring("ERROR|NO_PENDING_KEEPING_CURRENT|".length());
+      String activeDni = decryptDniForDisplay(response.substring("ERROR|NO_PENDING_KEEPING_CURRENT|".length()));
+      if (activeDni.isEmpty()) {
+        return;
+      }
       currentDni = activeDni;
       lastCalledDniLabel.setText(activeDni);
       lastCalledDniLabel.setFont(activeDniFont);
@@ -258,7 +287,10 @@ public class OperatorFrame extends JFrame {
     if (response.startsWith("OK|RENOTIFIED|")) {
       String[] parts = response.split("\\|");
       if (parts.length >= 4) {
-        currentDni = parts[2];
+        currentDni = decryptDniForDisplay(parts[2]);
+        if (currentDni.isEmpty()) {
+          return;
+        }
         clearError();
       } else {
         clearError();
@@ -321,6 +353,15 @@ public class OperatorFrame extends JFrame {
 
   private void clearError() {
     errorLabel.setText("");
+  }
+
+  private String decryptDniForDisplay(String encryptedDni) {
+    try {
+      return encryptionStrategy.decrypt(encryptedDni);
+    } catch (RuntimeException e) {
+      showError("Error: no se pudo descifrar el DNI.");
+      return "";
+    }
   }
 
   private void scheduleRenotifyCooldown() {

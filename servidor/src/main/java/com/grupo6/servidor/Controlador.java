@@ -5,6 +5,8 @@ import com.grupo6.modelo.FilaTurnos;
 import com.grupo6.modelo.NuevoLlamado;
 import com.grupo6.modelo.Renotificacion;
 import com.grupo6.modelo.Turno;
+import com.grupo6.security.AESEncryptionStrategy;
+import com.grupo6.security.EncryptionStrategy;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -25,7 +27,16 @@ public class Controlador {
   private final List<PrintWriter> monitorSubscribers = new ArrayList<>();
   private final List<PrintWriter> operatorSubscribers = new ArrayList<>();
   private final List<PrintWriter> replicaSubscribers = new ArrayList<>();
+  private final EncryptionStrategy encryptionStrategy;
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
+
+  public Controlador() {
+    this(new AESEncryptionStrategy());
+  }
+
+  public Controlador(EncryptionStrategy encryptionStrategy) {
+    this.encryptionStrategy = encryptionStrategy;
+  }
 
   public void subscribeMonitor(PrintWriter writer, BufferedReader reader) throws IOException {
     synchronized (this) {
@@ -111,12 +122,19 @@ public class Controlador {
       writer.println("ERROR|INVALID_REGISTER");
       return;
     }
-    String dni = parts[1].trim();
-    if (dni.isEmpty() || !isValidDni(dni)) {
+    String encryptedDni = parts[1].trim();
+    String plainDni;
+    try {
+      plainDni = encryptionStrategy.decrypt(encryptedDni);
+    } catch (RuntimeException e) {
       writer.println("ERROR|INVALID_DNI");
       return;
     }
-    Cliente cliente = new Cliente(dni);
+    if (encryptedDni.isEmpty() || !isValidDni(plainDni)) {
+      writer.println("ERROR|INVALID_DNI");
+      return;
+    }
+    Cliente cliente = new Cliente(encryptedDni);
     if (fila.existeClienteEnFila(cliente)) {
       writer.println("ERROR|ALREADY_IN_QUEUE");
       return;
@@ -127,7 +145,7 @@ public class Controlador {
     }
     fila.registrarCliente(cliente);
     broadcastToOperators("OK|QUEUE_SIZE|" + fila.obtenerCantidadTurnos());
-    writer.println("OK|REGISTERED|" + dni);
+    writer.println("OK|REGISTERED|" + encryptedDni);
     pushFullStateToReplicas();
   }
 

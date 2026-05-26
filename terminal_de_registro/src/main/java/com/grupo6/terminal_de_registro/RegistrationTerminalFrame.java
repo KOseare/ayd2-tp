@@ -17,6 +17,8 @@ import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 
 import com.grupo6.conexion_servidor.ConexionServidor;
+import com.grupo6.security.AESEncryptionStrategy;
+import com.grupo6.security.EncryptionStrategy;
 import com.grupo6.ui.AppUiTheme;
 
 public class RegistrationTerminalFrame extends JFrame {
@@ -24,6 +26,7 @@ public class RegistrationTerminalFrame extends JFrame {
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
   private final ConexionServidor conexionServidor = new ConexionServidor();
+  private final EncryptionStrategy encryptionStrategy;
   private final JTextField documentField;
   private final JLabel errorLabel;
 
@@ -44,12 +47,16 @@ public class RegistrationTerminalFrame extends JFrame {
       return;
     }
 
-    sendData(dni);
+    try {
+      sendData(encryptionStrategy.encrypt(dni));
+    } catch (RuntimeException e) {
+      showError("Error: no se pudo cifrar el DNI.");
+    }
   }
 
-  private void sendData(String dni) {
+  private void sendData(String encryptedDni) {
     try {
-      final String response = conexionServidor.sendCommand("REGISTER|" + dni);
+      final String response = conexionServidor.sendCommand("REGISTER|" + encryptedDni);
       if (response == null) {
         showError("Error: sin respuesta del servidor.");
         return;
@@ -86,6 +93,11 @@ public class RegistrationTerminalFrame extends JFrame {
   }
 
   public RegistrationTerminalFrame() {
+    this(new AESEncryptionStrategy());
+  }
+
+  public RegistrationTerminalFrame(EncryptionStrategy encryptionStrategy) {
+    this.encryptionStrategy = encryptionStrategy;
     setTitle("Terminal de Registro");
     setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
     setMinimumSize(new Dimension(440, 380));

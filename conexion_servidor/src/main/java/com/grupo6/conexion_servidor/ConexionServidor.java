@@ -42,6 +42,11 @@ public class ConexionServidor {
   }
 
   public void subscribeAndListen(String subscribeCommand, Callback onMessage, Callback onError) {
+    subscribeAndListen(subscribeCommand, onMessage, onError, msg -> {
+    });
+  }
+
+  public void subscribeAndListen(String subscribeCommand, Callback onMessage, Callback onError, Callback onConnected) {
     Thread t = new Thread(() -> {
       ensureInitialized();
       int tries = 1;
@@ -68,6 +73,7 @@ public class ConexionServidor {
             }
             continue;
           }
+          onConnected.onMessage(subscribedAck);
           String response = null;
           while ((response = reader.readLine()) != null) {
             onMessage.onMessage(response);
@@ -88,7 +94,9 @@ public class ConexionServidor {
   }
 
   public String sendCommand(String command) {
-    ensureInitialized();
+    if (!ensureInitialized()) {
+      return "ERROR|NO_ACTIVE_NODE";
+    }
     String response = sendCommandOneTry(command);
     int tries = 1;
     while (isServerFault(response) && tries < maxTries) {
@@ -105,6 +113,8 @@ public class ConexionServidor {
   }
 
   private boolean isServerFault(String response) {
+    if (response == null)
+      return true;
     if (response.toUpperCase().contains("ERROR|NO_RESPONSE"))
       return true;
     else if (response.toUpperCase().contains("ERROR|NETWORK"))
@@ -114,6 +124,9 @@ public class ConexionServidor {
 
   private String sendCommandOneTry(String command) {
     try {
+      if (activeId < 0 || activeId >= nodosServidores.size()) {
+        return "ERROR|NO_ACTIVE_NODE";
+      }
       final ServerAddress addr = nodosServidores.get(activeId);
       socket = new Socket(addr.host, addr.port);
       PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);

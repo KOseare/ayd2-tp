@@ -23,13 +23,17 @@ import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
 import com.grupo6.conexion_servidor.ConexionServidor;
+import com.grupo6.security.AESEncryptionStrategy;
+import com.grupo6.security.EncryptionStrategy;
 import com.grupo6.ui.AppUiTheme;
 
 public class PublicMonitorFrame extends JFrame {
 
   private static final long serialVersionUID = 1L;
   private static final int HISTORY_LIMIT = 5;
+  private static final int CURRENT_DNI_FONT_SIZE = 56;
   private final ConexionServidor conexionServidor = new ConexionServidor();
+  private final EncryptionStrategy encryptionStrategy;
 
   private final JLabel currentTurnLabel;
   private final JLabel currentStationLabel;
@@ -39,6 +43,11 @@ public class PublicMonitorFrame extends JFrame {
   private final Font historyFont;
 
   public PublicMonitorFrame() {
+    this(new AESEncryptionStrategy());
+  }
+
+  public PublicMonitorFrame(EncryptionStrategy encryptionStrategy) {
+    this.encryptionStrategy = encryptionStrategy;
     setTitle("Monitor de Sala");
     setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
     setMinimumSize(new Dimension(520, 520));
@@ -54,9 +63,11 @@ public class PublicMonitorFrame extends JFrame {
     currentCaption.setForeground(AppUiTheme.TEXT_MUTED);
 
     currentTurnLabel = new JLabel("-", SwingConstants.CENTER);
-    currentTurnLabel.setFont(base.deriveFont(Font.BOLD, 64f));
+    currentTurnLabel.setFont(base.deriveFont(Font.BOLD, CURRENT_DNI_FONT_SIZE));
     currentTurnLabel.setForeground(AppUiTheme.TEXT_HERO_DNI);
     currentTurnLabel.setOpaque(false);
+    currentTurnLabel.setPreferredSize(new Dimension(0, 96));
+    currentTurnLabel.setMinimumSize(new Dimension(0, 96));
 
     currentStationLabel = new JLabel("Puesto ID: -", SwingConstants.CENTER);
     currentStationLabel.setFont(base.deriveFont(Font.BOLD, 24f));
@@ -66,7 +77,9 @@ public class PublicMonitorFrame extends JFrame {
     hero.setBackground(AppUiTheme.BG_HERO);
     hero.setBorder(BorderFactory.createCompoundBorder(
         BorderFactory.createLineBorder(AppUiTheme.BORDER_HERO, 2),
-        BorderFactory.createEmptyBorder(20, 24, 28, 24)));
+        BorderFactory.createEmptyBorder(24, 24, 32, 24)));
+    hero.setPreferredSize(new Dimension(0, 230));
+    hero.setMinimumSize(new Dimension(0, 210));
     hero.add(currentCaption, BorderLayout.NORTH);
     hero.add(currentTurnLabel, BorderLayout.CENTER);
     hero.add(currentStationLabel, BorderLayout.SOUTH);
@@ -134,7 +147,9 @@ public class PublicMonitorFrame extends JFrame {
         (String msg) -> {
           SwingUtilities.invokeLater(() -> handleEvent(msg));
         }, (String err) -> {
-          SwingUtilities.invokeLater(() -> showError(err));
+          SwingUtilities.invokeLater(() -> handleConnectionError(err));
+        }, (String msg) -> {
+          SwingUtilities.invokeLater(() -> clearError());
         });
   }
 
@@ -146,7 +161,10 @@ public class PublicMonitorFrame extends JFrame {
     }
 
     if ("CALL".equals(parts[1]) && parts.length >= 4) {
-      String dni = parts[2];
+      String dni = decryptDniForDisplay(parts[2]);
+      if (dni.isEmpty()) {
+        return;
+      }
       String stationId = parts[3];
       updateTurn(dni, stationId);
       clearError();
@@ -154,7 +172,10 @@ public class PublicMonitorFrame extends JFrame {
     }
 
     if ("RENOTIFY".equals(parts[1]) && parts.length >= 5) {
-      String dni = parts[2];
+      String dni = decryptDniForDisplay(parts[2]);
+      if (dni.isEmpty()) {
+        return;
+      }
       String stationId = parts[3];
       updateCurrentTurnOnly(dni, stationId);
       runPriorityBlink();
@@ -208,6 +229,20 @@ public class PublicMonitorFrame extends JFrame {
 
   private void clearError() {
     errorLabel.setText("");
+  }
+
+  private void handleConnectionError(String message) {
+    updateCurrentTurnOnly("-", "-");
+    showError(message);
+  }
+
+  private String decryptDniForDisplay(String encryptedDni) {
+    try {
+      return encryptionStrategy.decrypt(encryptedDni);
+    } catch (RuntimeException e) {
+      showError("Error: no se pudo descifrar el DNI");
+      return "";
+    }
   }
 
   private void runPriorityBlink() {
