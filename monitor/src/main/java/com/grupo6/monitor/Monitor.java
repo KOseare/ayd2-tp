@@ -142,6 +142,16 @@ public class Monitor {
   }
 
   private void selectNewActiveNode() {
+    // Intentar reconocer al lider existente (si hay alguno que sea ACTIVE)
+    for (int i = 0; i < nodos.size(); i++) {
+      final ServerAddress addr = nodos.get(i);
+      String response = sendCommandTo(addr, "STATUS_UPDATE_REQUEST");
+      if (response.toUpperCase().contains("ACTIVE")) {
+        log("lider existente en indice " + i + "; re-sincronizando cluster");
+        setActiveNodeAndNotify(i);
+        return;
+      }
+    }
     for (int i = 0; i < nodos.size(); i++) {
       final ServerAddress addr = nodos.get(i);
       String response = sendCommandTo(addr, "STATUS_UPDATE_REQUEST");
