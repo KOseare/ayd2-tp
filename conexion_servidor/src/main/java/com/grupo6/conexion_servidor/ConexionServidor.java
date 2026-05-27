@@ -68,6 +68,7 @@ public class ConexionServidor {
             }
             continue;
           }
+          onMessage.onMessage("OK|CONNECTED");
           String response = null;
           while ((response = reader.readLine()) != null) {
             onMessage.onMessage(response);
