@@ -21,12 +21,17 @@ public class Controlador {
   }
 
   private void handleUpdate(String msg) {
+    if ("OK|CONNECTED".equals(msg)) {
+      modelo = new ModeloVista(modelo.personasEnCola, clearErrorOnSuccess(modelo.error, modelo.personasEnCola),
+          modelo.stationId, modelo.currentDni, modelo.renotifyBtnEnabled, modelo.finalizeBtnEnabled);
+      vista.actualizar(modelo);
+      return;
+    }
     if (msg != null && msg.startsWith("OK|QUEUE_SIZE|")) {
       String count = msg.substring("OK|QUEUE_SIZE|".length());
       int personas = Integer.parseInt(count);
 
-      String error = (personas > 0 && modelo.error != null
-          && modelo.error.contains("No hay clientes pendientes en la cola.")) ? null : modelo.error;
+      String error = clearErrorOnSuccess(modelo.error, personas);
 
       modelo = new ModeloVista(Integer.parseInt(count), error, modelo.stationId, modelo.currentDni,
           modelo.renotifyBtnEnabled, modelo.finalizeBtnEnabled);
@@ -179,8 +184,7 @@ public class Controlador {
       String count = response.substring("OK|QUEUE_SIZE|".length());
       int personas = Integer.parseInt(count);
 
-      String error = (personas > 0 && modelo.error != null
-          && modelo.error.contains("No hay clientes pendientes en la cola.")) ? null : modelo.error;
+      String error = clearErrorOnSuccess(modelo.error, personas);
 
       modelo = new ModeloVista(Integer.parseInt(count), error, modelo.stationId, modelo.currentDni,
           modelo.renotifyBtnEnabled, modelo.finalizeBtnEnabled);
@@ -274,6 +278,17 @@ public class Controlador {
       return;
     }
     conexionServidor.sendCommand("RELEASE_STATION|" + modelo.stationId);
+  }
+
+  private String clearErrorOnSuccess(String error, int personasEnCola) {
+    if (error != null && error.startsWith("ERROR|NETWORK|")) {
+      return null;
+    }
+    if (personasEnCola > 0 && error != null
+        && error.contains("No hay clientes pendientes en la cola.")) {
+      return null;
+    }
+    return error;
   }
 
   private void runAsync(Runnable action) {

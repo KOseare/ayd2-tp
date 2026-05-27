@@ -148,12 +148,15 @@ public class OperatorFrame extends JFrame implements IVista {
       if (input == null) {
         System.exit(0);
       }
-      if (input != null) {
-        String trimmed = input.trim();
-        if (!trimmed.isEmpty()) {
-          return trimmed;
-        }
+      String trimmed = input.trim();
+      if (!trimmed.isEmpty()) {
+        return trimmed;
       }
+      JOptionPane.showMessageDialog(
+          null,
+          "Error: el ID de puesto es obligatorio.",
+          "ID de Puesto",
+          JOptionPane.WARNING_MESSAGE);
     }
   }
 
