@@ -2,6 +2,9 @@ package com.grupo6.servidor;
 
 import com.grupo6.environment.Environment;
 import com.grupo6.environment.ServerAddress;
+import com.grupo6.persistencia.EstadoPersistencia;
+import com.grupo6.persistencia.PersistenciaFactory;
+import com.grupo6.persistencia.PersistenciaFactoryProvider;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,12 +13,15 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.util.Optional;
 
 public class Main {
   private static int port = 0;
   private static final Controlador service = new Controlador();
   private static String status = "standby"; // "standby" o "ACTIVE"
   private static int id = -1;
+  private static final PersistenciaFactory persistenciaFactory = PersistenciaFactoryProvider.createFromEnvironment();
+  private static volatile boolean coldStart = true;
 
   private static final Object replicaLock = new Object();
   private static volatile Thread replicaWorker = null;
@@ -142,9 +148,10 @@ public class Main {
     }
     if (upper.contains("START")) {
       logSrv("evento monitor: START - nodo promovido a ACTIVO");
-      status = "ACTIVE";
       stopReplicaClientSession();
       service.clearReplicaSubscribers();
+      activateAsLeader();
+      status = "ACTIVE";
       writer.println("OK");
       return true;
     }
@@ -159,6 +166,29 @@ public class Main {
     return false;
   }
 
+  private static void activateAsLeader() {
+    final EstadoPersistencia persistencia = persistenciaFactory.createEstadoPersistencia();
+    if (coldStart) {
+      try {
+        final Optional<String> snapshot = persistencia.load();
+        if (snapshot.isPresent()) {
+          synchronized (service) {
+            service.restorePersistedState(snapshot.get());
+          }
+          logSrv("persistencia: estado restaurado desde disco (arranque en frio)");
+        } else {
+          logSrv("persistencia: sin snapshot previo, inicio vacio");
+        }
+      } catch (IOException e) {
+        logSrvErr("persistencia: error al cargar, inicio vacio (" + e.getMessage() + ")");
+      }
+    } else {
+      logSrv("persistencia: estado ya en memoria, omite carga desde disco");
+    }
+    coldStart = false;
+    service.setEstadoPersistencia(persistencia);
+  }
+
   private static void onCurrentActiveNodeAnnouncement(int leaderId) {
     if (leaderId == id) {
       logSrv("cluster: confirmado como lider indice " + id);
@@ -170,6 +200,7 @@ public class Main {
       return;
     }
     status = "standby";
+    service.setEstadoPersistencia(null);
     logSrv("rol: pasivo - replica hacia lider " + leaderId);
     startReplicaClientSessionIfNeeded(leaderId);
   }
@@ -251,6 +282,7 @@ public class Main {
             synchronized (service) {
               service.applyFullStateFromLeaderLine(line);
             }
+            coldStart = false;
           } catch (RuntimeException ex) {
             logSrvErr("replica: error aplicando STATE_FULL (" + ex.getMessage() + ")");
           }
