@@ -2,9 +2,12 @@ package com.grupo6.servidor;
 
 import com.grupo6.environment.Environment;
 import com.grupo6.environment.ServerAddress;
-import com.grupo6.persistencia.EstadoPersistencia;
 import com.grupo6.persistencia.PersistenciaFactory;
 import com.grupo6.persistencia.PersistenciaFactoryProvider;
+import com.grupo6.persistencia.entidad.HistEntidad;
+import com.grupo6.persistencia.entidad.MapEntidad;
+import com.grupo6.persistencia.entidad.QueueEntidad;
+import com.grupo6.persistencia.entidad.StationsEntidad;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -13,7 +16,6 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.util.Optional;
 
 public class Main {
   private static int port = 0;
@@ -167,14 +169,18 @@ public class Main {
   }
 
   private static void activateAsLeader() {
-    final EstadoPersistencia persistencia = persistenciaFactory.createEstadoPersistencia();
+    final StationsEntidad stationsEntidad = persistenciaFactory.createStationsEntidad();
+    final QueueEntidad queueEntidad = persistenciaFactory.createQueueEntidad();
+    final MapEntidad mapEntidad = persistenciaFactory.createMapEntidad();
+    final HistEntidad histEntidad = persistenciaFactory.createHistEntidad();
+    service.setPersistenciaEntidades(stationsEntidad, queueEntidad, mapEntidad, histEntidad);
     if (coldStart) {
       try {
-        final Optional<String> snapshot = persistencia.load();
-        if (snapshot.isPresent()) {
-          synchronized (service) {
-            service.restorePersistedState(snapshot.get());
-          }
+        final boolean restored;
+        synchronized (service) {
+          restored = service.restorePersistedState();
+        }
+        if (restored) {
           logSrv("persistencia: estado restaurado desde disco (arranque en frio)");
         } else {
           logSrv("persistencia: sin snapshot previo, inicio vacio");
@@ -186,7 +192,6 @@ public class Main {
       logSrv("persistencia: estado ya en memoria, omite carga desde disco");
     }
     coldStart = false;
-    service.setEstadoPersistencia(persistencia);
   }
 
   private static void onCurrentActiveNodeAnnouncement(int leaderId) {
@@ -200,7 +205,7 @@ public class Main {
       return;
     }
     status = "standby";
-    service.setEstadoPersistencia(null);
+    service.clearPersistenciaEntidades();
     logSrv("rol: pasivo - replica hacia lider " + leaderId);
     startReplicaClientSessionIfNeeded(leaderId);
   }

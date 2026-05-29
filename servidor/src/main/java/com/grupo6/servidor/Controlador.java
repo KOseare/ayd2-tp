@@ -5,7 +5,10 @@ import com.grupo6.modelo.FilaTurnos;
 import com.grupo6.modelo.NuevoLlamado;
 import com.grupo6.modelo.Renotificacion;
 import com.grupo6.modelo.Turno;
-import com.grupo6.persistencia.EstadoPersistencia;
+import com.grupo6.persistencia.entidad.HistEntidad;
+import com.grupo6.persistencia.entidad.MapEntidad;
+import com.grupo6.persistencia.entidad.QueueEntidad;
+import com.grupo6.persistencia.entidad.StationsEntidad;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -26,15 +29,62 @@ public class Controlador {
   private final List<PrintWriter> monitorSubscribers = new ArrayList<>();
   private final List<PrintWriter> operatorSubscribers = new ArrayList<>();
   private final List<PrintWriter> replicaSubscribers = new ArrayList<>();
-  private EstadoPersistencia estadoPersistencia;
+  private StationsEntidad stationsEntidad;
+  private QueueEntidad queueEntidad;
+  private MapEntidad mapEntidad;
+  private HistEntidad histEntidad;
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
-  public synchronized void setEstadoPersistencia(EstadoPersistencia estadoPersistencia) {
-    this.estadoPersistencia = estadoPersistencia;
+  public synchronized void setPersistenciaEntidades(
+      StationsEntidad stationsEntidad,
+      QueueEntidad queueEntidad,
+      MapEntidad mapEntidad,
+      HistEntidad histEntidad) {
+    this.stationsEntidad = stationsEntidad;
+    this.queueEntidad = queueEntidad;
+    this.mapEntidad = mapEntidad;
+    this.histEntidad = histEntidad;
   }
 
-  public synchronized void restorePersistedState(String snapshotLine) {
-    applyFullStateFromLeaderLine(snapshotLine);
+  public synchronized void clearPersistenciaEntidades() {
+    setPersistenciaEntidades(null, null, null, null);
+  }
+
+  public synchronized boolean restorePersistedState() throws IOException {
+    if (!hasPersistenciaEntidades()) {
+      return false;
+    }
+    boolean restored = false;
+    final Optional<String> stationsBlock = stationsEntidad.load();
+    if (stationsBlock.isPresent()) {
+      claimedStationIds.clear();
+      for (String stationId : stationsBlock.get().split("\n", -1)) {
+        if (!stationId.isEmpty()) {
+          claimedStationIds.add(stationId);
+        }
+      }
+      restored = true;
+    }
+    final StringBuilder filaPlain = new StringBuilder(256);
+    final Optional<String> queueBlock = queueEntidad.load();
+    if (queueBlock.isPresent()) {
+      filaPlain.append(queueBlock.get().trim()).append('\n');
+      restored = true;
+    }
+    final Optional<String> mapLine = mapEntidad.load();
+    if (mapLine.isPresent()) {
+      filaPlain.append(mapLine.get().trim()).append('\n');
+      restored = true;
+    }
+    final Optional<String> histLine = histEntidad.load();
+    if (histLine.isPresent()) {
+      filaPlain.append(histLine.get().trim()).append('\n');
+      restored = true;
+    }
+    if (filaPlain.length() > 0) {
+      fila.replaceStateFromPlain(filaPlain.toString());
+    }
+    return restored;
   }
 
   public void subscribeMonitor(PrintWriter writer, BufferedReader reader) throws IOException {
@@ -298,14 +348,26 @@ public class Controlador {
   }
 
   private void persistCurrentState() {
-    if (estadoPersistencia == null) {
+    if (!hasPersistenciaEntidades()) {
       return;
     }
     try {
-      estadoPersistencia.save(buildFullStateLine());
+      final String stationsBlock =
+          claimedStationIds.stream().sorted().collect(Collectors.joining("\n"));
+      stationsEntidad.save(stationsBlock);
+      queueEntidad.save(fila.exportNextLine() + "\n" + fila.exportQueueLine());
+      mapEntidad.save(fila.exportMapLine());
+      histEntidad.save(fila.exportHistLine());
     } catch (IOException e) {
       System.err.println("[SERVIDOR] persistencia: error al guardar estado (" + e.getMessage() + ")");
     }
+  }
+
+  private boolean hasPersistenciaEntidades() {
+    return stationsEntidad != null
+        && queueEntidad != null
+        && mapEntidad != null
+        && histEntidad != null;
   }
 
   private void pushFullStateToReplicas() {

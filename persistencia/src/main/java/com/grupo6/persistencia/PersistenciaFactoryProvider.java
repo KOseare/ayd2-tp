@@ -10,7 +10,7 @@ public final class PersistenciaFactoryProvider {
   public static PersistenciaFactory createFromEnvironment() {
     final String type = Environment.persistenciaTipo.toUpperCase();
     if ("TEXT_FILE".equals(type)) {
-      return new TextFilePersistenciaFactory(Environment.persistenciaRuta);
+      return new TextFilePersistenciaFactory(Environment.persistenciaDirectorio);
     }
     throw new IllegalArgumentException("Unsupported persistencia type: " + type);
   }

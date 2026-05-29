@@ -1,21 +1,51 @@
 package com.grupo6.persistencia.textfile;
 
-import com.grupo6.persistencia.EstadoPersistencia;
 import com.grupo6.persistencia.PersistenciaFactory;
+import com.grupo6.persistencia.entidad.HistEntidad;
+import com.grupo6.persistencia.entidad.MapEntidad;
+import com.grupo6.persistencia.entidad.QueueEntidad;
+import com.grupo6.persistencia.entidad.StationsEntidad;
+import java.io.File;
 
 public class TextFilePersistenciaFactory extends PersistenciaFactory {
 
-  private final String filePath;
+  private static final String STATIONS_FILE = "stations.txt";
+  private static final String QUEUE_FILE = "queue.txt";
+  private static final String MAP_FILE = "map.txt";
+  private static final String HIST_FILE = "hist.txt";
 
-  public TextFilePersistenciaFactory(String filePath) {
-    if (filePath == null || filePath.trim().isEmpty()) {
-      throw new IllegalArgumentException("Persistencia file path must not be empty");
+  private final TextFileDiskHelper disk;
+  private final String baseDirectory;
+
+  public TextFilePersistenciaFactory(String baseDirectory) {
+    if (baseDirectory == null || baseDirectory.trim().isEmpty()) {
+      throw new IllegalArgumentException("Persistence base directory must not be empty");
     }
-    this.filePath = filePath.trim();
+    this.baseDirectory = baseDirectory.trim();
+    this.disk = new TextFileDiskHelper();
   }
 
   @Override
-  public EstadoPersistencia createEstadoPersistencia() {
-    return new TextFileEstadoPersistencia(filePath);
+  public StationsEntidad createStationsEntidad() {
+    return new TextFileStationsEntidad(disk, resolvePath(STATIONS_FILE));
+  }
+
+  @Override
+  public QueueEntidad createQueueEntidad() {
+    return new TextFileQueueEntidad(disk, resolvePath(QUEUE_FILE));
+  }
+
+  @Override
+  public MapEntidad createMapEntidad() {
+    return new TextFileMapEntidad(disk, resolvePath(MAP_FILE));
+  }
+
+  @Override
+  public HistEntidad createHistEntidad() {
+    return new TextFileHistEntidad(disk, resolvePath(HIST_FILE));
+  }
+
+  private String resolvePath(String fileName) {
+    return new File(baseDirectory, fileName).getPath();
   }
 }

@@ -15,7 +15,8 @@ public abstract class Environment {
   public static final List<ServerAddress> nodosServidores = getServidores();
 
   public static final String persistenciaTipo = getString("PERSISTENCIA_TIPO", "TEXT_FILE");
-  public static final String persistenciaRuta = getString("PERSISTENCIA_RUTA", "./data/estado_servidor.txt");
+  public static final String persistenciaDirectorio =
+      getString("PERSISTENCIA_DIR", "./data/persistencia");
 
   private static List<ServerAddress> getServidores() {
     final int nqty = getInt("CANTIDAD_NODOS", 3);
