@@ -55,6 +55,12 @@ public class Controlador {
   }
 
   private void handleError(String msg) {
+    if (msg != null && msg.startsWith("ERROR|NETWORK|")) {
+      clearRenotifyCooldown();
+      modelo = new ModeloVista(-1, msg, modelo.stationId, null, false, false);
+      vista.actualizar(modelo);
+      return;
+    }
     modelo = new ModeloVista(modelo.personasEnCola, msg, modelo.stationId, modelo.currentDni, modelo.renotifyBtnEnabled,
         modelo.finalizeBtnEnabled);
     vista.actualizar(modelo);

@@ -33,7 +33,7 @@ public class Controlador {
         (String msg) -> {
           invokeLater.invokeLater(() -> handleEvent(msg));
         }, (String err) -> {
-          invokeLater.invokeLater(() -> showError(err));
+          invokeLater.invokeLater(() -> handleConnectionError(err));
         });
   }
 
@@ -89,6 +89,11 @@ public class Controlador {
   private void showError(String error) {
     modelo = new ModeloVista(modelo.dniTurnoActual, modelo.idPuestoTurnoActual, modelo.historialDeLlamadas, error,
         false);
+    vista.actualizar(modelo);
+  }
+
+  private void handleConnectionError(String error) {
+    modelo = new ModeloVista("-", "-", modelo.historialDeLlamadas, error, false);
     vista.actualizar(modelo);
   }
 
