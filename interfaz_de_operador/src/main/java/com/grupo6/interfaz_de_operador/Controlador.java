@@ -1,13 +1,24 @@
 package com.grupo6.interfaz_de_operador;
 
 import com.grupo6.conexion_servidor.ConexionServidor;
+import com.grupo6.security.AESEncryptionStrategy;
+import com.grupo6.security.EncryptionStrategy;
 
 public class Controlador {
   private static final int RENOTIFY_COOLDOWN_MS = 30_000;
   private final ConexionServidor conexionServidor = new ConexionServidor();
+  private final EncryptionStrategy encryptionStrategy;
   private IVista vista = null;
   private ModeloVista modelo = new ModeloVista(0, null, null, null, true, true);
   private long renotifyEnabledAtMs;
+
+  public Controlador() {
+    this(new AESEncryptionStrategy());
+  }
+
+  public Controlador(EncryptionStrategy encryptionStrategy) {
+    this.encryptionStrategy = encryptionStrategy;
+  }
 
   public void setVista(IVista vista) {
     this.vista = vista;
@@ -98,7 +109,10 @@ public class Controlador {
 
   private void handleCallNextResponse(String response, InvokeLaterCallback invokeLater) {
     if (response.startsWith("OK|CALLED|")) {
-      final String currentDni = response.substring("OK|CALLED|".length());
+      final String currentDni = decryptDniForDisplay(response.substring("OK|CALLED|".length()));
+      if (currentDni == null) {
+        return;
+      }
       modelo = new ModeloVista(modelo.personasEnCola, null, modelo.stationId,
           currentDni, renotifyEnabled(),
           finalizeEnabled());
@@ -117,7 +131,10 @@ public class Controlador {
       return;
     }
     if (response.startsWith("ERROR|NO_PENDING_KEEPING_CURRENT|")) {
-      String activeDni = response.substring("ERROR|NO_PENDING_KEEPING_CURRENT|".length());
+      String activeDni = decryptDniForDisplay(response.substring("ERROR|NO_PENDING_KEEPING_CURRENT|".length()));
+      if (activeDni == null) {
+        return;
+      }
       modelo = new ModeloVista(modelo.personasEnCola, "No hay clientes pendientes en la cola.", modelo.stationId,
           activeDni, renotifyEnabled(),
           finalizeEnabled());
@@ -233,7 +250,11 @@ public class Controlador {
       scheduleRenotifyCooldown();
       refreshQueueCountAsync(invokeLater);
       if (parts.length >= 4) {
-        modelo = new ModeloVista(modelo.personasEnCola, null, modelo.stationId, parts[2], renotifyEnabled(),
+        String currentDni = decryptDniForDisplay(parts[2]);
+        if (currentDni == null) {
+          return;
+        }
+        modelo = new ModeloVista(modelo.personasEnCola, null, modelo.stationId, currentDni, renotifyEnabled(),
             finalizeEnabled());
         vista.actualizar(modelo);
       } else {
@@ -289,6 +310,17 @@ public class Controlador {
       return null;
     }
     return error;
+  }
+
+  private String decryptDniForDisplay(String encryptedDni) {
+    try {
+      return encryptionStrategy.decrypt(encryptedDni);
+    } catch (RuntimeException e) {
+      modelo = new ModeloVista(modelo.personasEnCola, "Error: no se pudo descifrar el DNI.", modelo.stationId,
+          modelo.currentDni, renotifyEnabled(), finalizeEnabled());
+      vista.actualizar(modelo);
+      return null;
+    }
   }
 
   private void runAsync(Runnable action) {
