@@ -107,13 +107,18 @@ public class FilaTurnos {
     return Optional.of(t);
   }
 
-  public synchronized String exportStateBlob() {
-    StringBuilder sb = new StringBuilder(256);
-    sb.append("NEXT:").append(nextTurnId).append('\n');
-    sb.append("QUEUE:");
+  public synchronized String exportNextLine() {
+    return "NEXT:" + nextTurnId;
+  }
+
+  public synchronized String exportQueueLine() {
+    StringBuilder sb = new StringBuilder("QUEUE:");
     appendTurnRecords(sb, new ArrayList<>(enEspera), '~');
-    sb.append('\n');
-    sb.append("MAP:");
+    return sb.toString();
+  }
+
+  public synchronized String exportMapLine() {
+    StringBuilder sb = new StringBuilder("MAP:");
     boolean first = true;
     for (Map.Entry<String, Turno> e : turnoPorEstacion.entrySet()) {
       if (!first) {
@@ -122,20 +127,31 @@ public class FilaTurnos {
       first = false;
       sb.append(escapePipe(e.getKey())).append('=').append(encodeTurn(e.getValue()));
     }
-    sb.append('\n');
-    sb.append("HIST:");
-    appendTurnRecords(sb, turnosLlamados, '~');
-    sb.append('\n');
-    return Base64.getEncoder().encodeToString(sb.toString().getBytes(StandardCharsets.UTF_8));
+    return sb.toString();
   }
 
-  public synchronized void replaceStateFromBlob(String base64Blob) {
-    String raw;
-    try {
-      raw = new String(Base64.getDecoder().decode(base64Blob), StandardCharsets.UTF_8);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Invalid replication snapshot encoding", e);
-    }
+  public synchronized String exportHistLine() {
+    StringBuilder sb = new StringBuilder("HIST:");
+    appendTurnRecords(sb, turnosLlamados, '~');
+    return sb.toString();
+  }
+
+  public synchronized String exportStatePlain() {
+    return exportNextLine()
+        + '\n'
+        + exportQueueLine()
+        + '\n'
+        + exportMapLine()
+        + '\n'
+        + exportHistLine()
+        + '\n';
+  }
+
+  public synchronized String exportStateBlob() {
+    return Base64.getEncoder().encodeToString(exportStatePlain().getBytes(StandardCharsets.UTF_8));
+  }
+
+  public synchronized void replaceStateFromPlain(String raw) {
     String[] lines = raw.split("\n", -1);
     if (lines.length < 4) {
       throw new IllegalArgumentException("Invalid replication snapshot");
@@ -195,6 +211,16 @@ public class FilaTurnos {
         turnosLlamados.add(decodeTurn(rec));
       }
     }
+  }
+
+  public synchronized void replaceStateFromBlob(String base64Blob) {
+    String raw;
+    try {
+      raw = new String(Base64.getDecoder().decode(base64Blob), StandardCharsets.UTF_8);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Invalid replication snapshot encoding", e);
+    }
+    replaceStateFromPlain(raw);
   }
 
   private static void appendTurnRecords(StringBuilder sb, List<Turno> turns, char sep) {

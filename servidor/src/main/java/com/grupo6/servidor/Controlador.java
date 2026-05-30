@@ -5,6 +5,10 @@ import com.grupo6.modelo.FilaTurnos;
 import com.grupo6.modelo.NuevoLlamado;
 import com.grupo6.modelo.Renotificacion;
 import com.grupo6.modelo.Turno;
+import com.grupo6.persistencia.entidad.HistEntidad;
+import com.grupo6.persistencia.entidad.MapEntidad;
+import com.grupo6.persistencia.entidad.QueueEntidad;
+import com.grupo6.persistencia.entidad.StationsEntidad;
 import com.grupo6.security.AESEncryptionStrategy;
 import com.grupo6.security.EncryptionStrategy;
 import java.io.BufferedReader;
@@ -27,6 +31,12 @@ public class Controlador {
   private final List<PrintWriter> monitorSubscribers = new ArrayList<>();
   private final List<PrintWriter> operatorSubscribers = new ArrayList<>();
   private final List<PrintWriter> replicaSubscribers = new ArrayList<>();
+  private StationsEntidad stationsEntidad;
+  private QueueEntidad queueEntidad;
+  private MapEntidad mapEntidad;
+  private HistEntidad histEntidad;
+  private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
+
   private final EncryptionStrategy encryptionStrategy;
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
@@ -36,6 +46,58 @@ public class Controlador {
 
   public Controlador(EncryptionStrategy encryptionStrategy) {
     this.encryptionStrategy = encryptionStrategy;
+  }
+
+  public synchronized void setPersistenciaEntidades(
+      StationsEntidad stationsEntidad,
+      QueueEntidad queueEntidad,
+      MapEntidad mapEntidad,
+      HistEntidad histEntidad) {
+    this.stationsEntidad = stationsEntidad;
+    this.queueEntidad = queueEntidad;
+    this.mapEntidad = mapEntidad;
+    this.histEntidad = histEntidad;
+  }
+
+  public synchronized void clearPersistenciaEntidades() {
+    setPersistenciaEntidades(null, null, null, null);
+  }
+
+  public synchronized boolean restorePersistedState() throws IOException {
+    if (!hasPersistenciaEntidades()) {
+      return false;
+    }
+    boolean restored = false;
+    final Optional<String> stationsBlock = stationsEntidad.load();
+    if (stationsBlock.isPresent()) {
+      claimedStationIds.clear();
+      for (String stationId : stationsBlock.get().split("\n", -1)) {
+        if (!stationId.isEmpty()) {
+          claimedStationIds.add(stationId);
+        }
+      }
+      restored = true;
+    }
+    final StringBuilder filaPlain = new StringBuilder(256);
+    final Optional<String> queueBlock = queueEntidad.load();
+    if (queueBlock.isPresent()) {
+      filaPlain.append(queueBlock.get().trim()).append('\n');
+      restored = true;
+    }
+    final Optional<String> mapLine = mapEntidad.load();
+    if (mapLine.isPresent()) {
+      filaPlain.append(mapLine.get().trim()).append('\n');
+      restored = true;
+    }
+    final Optional<String> histLine = histEntidad.load();
+    if (histLine.isPresent()) {
+      filaPlain.append(histLine.get().trim()).append('\n');
+      restored = true;
+    }
+    if (filaPlain.length() > 0) {
+      fila.replaceStateFromPlain(filaPlain.toString());
+    }
+    return restored;
   }
 
   public void subscribeMonitor(PrintWriter writer, BufferedReader reader) throws IOException {
@@ -146,7 +208,7 @@ public class Controlador {
     fila.registrarCliente(cliente);
     broadcastToOperators("OK|QUEUE_SIZE|" + fila.obtenerCantidadTurnos());
     writer.println("OK|REGISTERED|" + encryptedDni);
-    pushFullStateToReplicas();
+    commitState();
   }
 
   public synchronized void handleClaimStation(String[] parts, PrintWriter writer) {
@@ -165,7 +227,7 @@ public class Controlador {
     }
     claimedStationIds.add(stationId);
     writer.println("OK|STATION_CLAIMED|" + stationId);
-    pushFullStateToReplicas();
+    commitState();
   }
 
   public synchronized void handleReleaseStation(String[] parts, PrintWriter writer) {
@@ -180,7 +242,7 @@ public class Controlador {
     }
     claimedStationIds.remove(stationId);
     writer.println("OK|STATION_RELEASED|" + stationId);
-    pushFullStateToReplicas();
+    commitState();
   }
 
   public synchronized void handleGetQueueSize(PrintWriter writer) {
@@ -217,7 +279,7 @@ public class Controlador {
         }
         writer.println("OK|CALLED|" + asignado.getDni());
         broadcastToMonitors("EVENT|CALL|" + asignado.getDni() + "|" + stationId);
-        pushFullStateToReplicas();
+        commitState();
         return;
       default:
         writer.println("ERROR|UNKNOWN_COMMAND");
@@ -240,13 +302,13 @@ public class Controlador {
         int intentos = r.getIntentos();
         broadcastToMonitors("EVENT|RENOTIFY|" + dniN + "|" + stationId + "|" + intentos);
         writer.println("OK|RENOTIFIED|" + dniN + "|" + intentos);
-        pushFullStateToReplicas();
+        commitState();
         return;
       case REMOVIDO_POR_LIMITE:
         String dniL = r.getDni().orElse("");
         writer.println("OK|REMOVED_BY_LIMIT|" + dniL);
         broadcastToMonitors("EVENT|REMOVED|" + dniL + "|" + stationId);
-        pushFullStateToReplicas();
+        commitState();
         return;
       default:
         writer.println("ERROR|UNKNOWN_COMMAND");
@@ -267,7 +329,7 @@ public class Controlador {
     String dni = finalized.get().getDni();
     writer.println("OK|FINALIZED|" + dni);
     broadcastToMonitors("EVENT|FINALIZED|" + dni + "|" + stationId);
-    pushFullStateToReplicas();
+    commitState();
   }
 
   private synchronized void broadcastToMonitors(String message) {
@@ -298,6 +360,34 @@ public class Controlador {
     String body = claimsBlock + "\n--\n" + fila.exportStateBlob();
     return "STATE_FULL|"
         + Base64.getEncoder().encodeToString(body.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private void commitState() {
+    pushFullStateToReplicas();
+    persistCurrentState();
+  }
+
+  private void persistCurrentState() {
+    if (!hasPersistenciaEntidades()) {
+      return;
+    }
+    try {
+      final String stationsBlock =
+          claimedStationIds.stream().sorted().collect(Collectors.joining("\n"));
+      stationsEntidad.save(stationsBlock);
+      queueEntidad.save(fila.exportNextLine() + "\n" + fila.exportQueueLine());
+      mapEntidad.save(fila.exportMapLine());
+      histEntidad.save(fila.exportHistLine());
+    } catch (IOException e) {
+      System.err.println("[SERVIDOR] persistencia: error al guardar estado (" + e.getMessage() + ")");
+    }
+  }
+
+  private boolean hasPersistenciaEntidades() {
+    return stationsEntidad != null
+        && queueEntidad != null
+        && mapEntidad != null
+        && histEntidad != null;
   }
 
   private void pushFullStateToReplicas() {
