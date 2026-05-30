@@ -11,6 +11,7 @@ public abstract class Environment {
   public static final int cantidadNodos = getInt("CANTIDAD_NODOS", 5);
   public static final String monitorHost = getString("MONITOR_HOST", "localhost");
   public static final int monitorPort = getInt("MONITOR_PORT", 3006);
+  public static final String serverSecretKey = getString("SERVER_SECRET_KEY", "grupo6-default-secret-key");
 
   public static final List<ServerAddress> nodosServidores = getServidores();
 
