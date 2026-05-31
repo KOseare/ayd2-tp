@@ -11,12 +11,14 @@ import java.util.ArrayList;
 import java.util.List;
 import com.grupo6.environment.Environment;
 import com.grupo6.environment.ServerAddress;
+import com.grupo6.shared.Publisher;
+import com.grupo6.shared.Subscriber;
 
-public class Monitor {
+public class Monitor implements Publisher<ModeloVista> {
+  private final List<Subscriber<ModeloVista>> subscribers = new ArrayList<>();
   private final List<ServerAddress> nodos = Environment.nodosServidores;
   private int port = Environment.monitorPort;
   private int activeNodeId = -1;
-  private Controlador controlador;
 
   private static void log(String message) {
     System.out.println("[MONITOR] " + message);
@@ -24,10 +26,6 @@ public class Monitor {
 
   private static void logErr(String message) {
     System.err.println("[MONITOR] " + message);
-  }
-
-  public void setControlador(Controlador controlador) {
-    this.controlador = controlador;
   }
 
   public void start() {
@@ -55,9 +53,6 @@ public class Monitor {
   }
 
   private void pushClusterStateToUi() {
-    if (controlador == null) {
-      return;
-    }
     List<String> nombres = new ArrayList<>();
     List<String> estados = new ArrayList<>();
 
@@ -83,7 +78,7 @@ public class Monitor {
         }
       }
     }
-    controlador.actualizarEstado(new ModeloVista(activeNodeId, nombres, estados));
+    notifySubscribers(new ModeloVista(activeNodeId, nombres, estados));
   }
 
   private void startServer() throws IOException {
@@ -182,6 +177,23 @@ public class Monitor {
       return response;
     } catch (IOException e) {
       return "ERROR|NETWORK|" + e.getMessage();
+    }
+  }
+
+  @Override
+  public void subscribe(Subscriber<ModeloVista> s) {
+    subscribers.add(s);
+  }
+
+  @Override
+  public void unsubscribe(Subscriber<ModeloVista> s) {
+    subscribers.remove(s);
+  }
+
+  @Override
+  public void notifySubscribers(ModeloVista context) {
+    for (Subscriber<ModeloVista> s : subscribers) {
+      s.update(context);
     }
   }
 }

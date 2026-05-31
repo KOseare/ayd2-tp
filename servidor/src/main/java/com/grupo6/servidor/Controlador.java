@@ -38,7 +38,6 @@ public class Controlador {
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
   private final EncryptionStrategy encryptionStrategy;
-  private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
   public Controlador() {
     this(new AESEncryptionStrategy());
@@ -355,8 +354,7 @@ public class Controlador {
   }
 
   private String buildFullStateLine() {
-    String claimsBlock =
-        claimedStationIds.stream().sorted().collect(Collectors.joining("\n"));
+    String claimsBlock = claimedStationIds.stream().sorted().collect(Collectors.joining("\n"));
     String body = claimsBlock + "\n--\n" + fila.exportStateBlob();
     return "STATE_FULL|"
         + Base64.getEncoder().encodeToString(body.getBytes(StandardCharsets.UTF_8));
@@ -372,8 +370,7 @@ public class Controlador {
       return;
     }
     try {
-      final String stationsBlock =
-          claimedStationIds.stream().sorted().collect(Collectors.joining("\n"));
+      final String stationsBlock = claimedStationIds.stream().sorted().collect(Collectors.joining("\n"));
       stationsEntidad.save(stationsBlock);
       queueEntidad.save(fila.exportNextLine() + "\n" + fila.exportQueueLine());
       mapEntidad.save(fila.exportMapLine());

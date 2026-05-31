@@ -62,7 +62,8 @@ public class MonitorFrame extends JFrame implements IVista {
   }
 
   @Override
-  public void setControlador(Controlador controlador) {}
+  public void setControlador(Controlador controlador) {
+  }
 
   @Override
   public void actualizar(ModeloVista modelo) {
