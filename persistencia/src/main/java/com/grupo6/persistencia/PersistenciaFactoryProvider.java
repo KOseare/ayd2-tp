@@ -1,6 +1,7 @@
 package com.grupo6.persistencia;
 
 import com.grupo6.environment.Environment;
+import com.grupo6.persistencia.json.JsonPersistenciaFactory;
 import com.grupo6.persistencia.textfile.TextFilePersistenciaFactory;
 
 public final class PersistenciaFactoryProvider {
@@ -11,6 +12,9 @@ public final class PersistenciaFactoryProvider {
     final String type = Environment.persistenciaTipo.toUpperCase();
     if ("TEXT_FILE".equals(type)) {
       return new TextFilePersistenciaFactory(Environment.persistenciaDirectorio);
+    }
+    if ("JSON".equals(type)) {
+      return new JsonPersistenciaFactory(Environment.persistenciaDirectorio);
     }
     throw new IllegalArgumentException("Unsupported persistencia type: " + type);
   }
