@@ -3,6 +3,7 @@ package com.grupo6.persistencia;
 import com.grupo6.environment.Environment;
 import com.grupo6.persistencia.json.JsonPersistenciaFactory;
 import com.grupo6.persistencia.textfile.TextFilePersistenciaFactory;
+import com.grupo6.persistencia.xml.XmlPersistenciaFactory;
 
 public final class PersistenciaFactoryProvider {
 
@@ -15,6 +16,9 @@ public final class PersistenciaFactoryProvider {
     }
     if ("JSON".equals(type)) {
       return new JsonPersistenciaFactory(Environment.persistenciaDirectorio);
+    }
+    if ("XML".equals(type)) {
+      return new XmlPersistenciaFactory(Environment.persistenciaDirectorio);
     }
     throw new IllegalArgumentException("Unsupported persistencia type: " + type);
   }
