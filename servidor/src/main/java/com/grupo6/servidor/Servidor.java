@@ -242,6 +242,8 @@ public class Servidor {
   }
 
   private void runOneReplicaConnection(int leaderId) throws InterruptedException {
+    if (leaderId < 0 || leaderId >= Environment.nodosServidores.size())
+      return;
     final ServerAddress addr = Environment.nodosServidores.get(leaderId);
     try (Socket socket = new Socket(addr.host, addr.port);
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
