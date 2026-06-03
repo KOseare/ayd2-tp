@@ -12,12 +12,12 @@ public abstract class Environment {
   public static final String monitorHost = getString("MONITOR_HOST", "localhost");
   public static final int monitorPort = getInt("MONITOR_PORT", 3006);
   public static final String serverSecretKey = getString("SERVER_SECRET_KEY", "grupo6-default-secret-key");
+  public static final String encryptionMethod = getString("ENCRYPTION_METHOD", "AES");
 
   public static final List<ServerAddress> nodosServidores = getServidores();
 
   public static final String persistenciaTipo = getString("PERSISTENCIA_TIPO", "TEXT_FILE");
-  public static final String persistenciaDirectorio =
-      getString("PERSISTENCIA_DIR", "./data/persistencia");
+  public static final String persistenciaDirectorio = getString("PERSISTENCIA_DIR", "./data/persistencia");
 
   private static List<ServerAddress> getServidores() {
     final int nqty = getInt("CANTIDAD_NODOS", 3);

@@ -3,7 +3,6 @@ package com.grupo6.terminal_de_registro;
 import java.util.regex.Pattern;
 
 import com.grupo6.conexion_servidor.ConexionServidor;
-import com.grupo6.security.AESEncryptionStrategy;
 import com.grupo6.security.EncryptionStrategy;
 
 public class Controlador {
@@ -13,10 +12,6 @@ public class Controlador {
   private final ConexionServidor conexion = new ConexionServidor();
   private final EncryptionStrategy encryptionStrategy;
   private ModeloVista modelo = new ModeloVista(null, null);
-
-  public Controlador() {
-    this(new AESEncryptionStrategy());
-  }
 
   public Controlador(EncryptionStrategy encryptionStrategy) {
     this.encryptionStrategy = encryptionStrategy;

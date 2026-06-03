@@ -1,7 +1,6 @@
 package com.grupo6.interfaz_de_operador;
 
 import com.grupo6.conexion_servidor.ConexionServidor;
-import com.grupo6.security.AESEncryptionStrategy;
 import com.grupo6.security.EncryptionStrategy;
 
 public class Controlador {
@@ -11,10 +10,6 @@ public class Controlador {
   private IVista vista = null;
   private ModeloVista modelo = new ModeloVista(0, null, null, null, true, true);
   private long renotifyEnabledAtMs;
-
-  public Controlador() {
-    this(new AESEncryptionStrategy());
-  }
 
   public Controlador(EncryptionStrategy encryptionStrategy) {
     this.encryptionStrategy = encryptionStrategy;

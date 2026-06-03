@@ -9,7 +9,6 @@ import com.grupo6.persistencia.entidad.HistEntidad;
 import com.grupo6.persistencia.entidad.MapEntidad;
 import com.grupo6.persistencia.entidad.QueueEntidad;
 import com.grupo6.persistencia.entidad.StationsEntidad;
-import com.grupo6.security.AESEncryptionStrategy;
 import com.grupo6.security.EncryptionStrategy;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -38,10 +37,6 @@ public class Controlador {
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
   private final EncryptionStrategy encryptionStrategy;
-
-  public Controlador() {
-    this(new AESEncryptionStrategy());
-  }
 
   public Controlador(EncryptionStrategy encryptionStrategy) {
     this.encryptionStrategy = encryptionStrategy;
@@ -333,6 +328,8 @@ public class Controlador {
 
   private synchronized void broadcastToMonitors(String message) {
     List<PrintWriter> disconnected = new ArrayList<>();
+    // TODO: Manejar caso de monitorSubscribers vacío (al llamar al siguiente en la
+    // fila)
     for (PrintWriter monitorWriter : monitorSubscribers) {
       monitorWriter.println(message);
       if (monitorWriter.checkError()) {
