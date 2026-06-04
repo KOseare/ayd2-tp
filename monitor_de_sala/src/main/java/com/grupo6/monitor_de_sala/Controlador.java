@@ -4,7 +4,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 import com.grupo6.conexion_servidor.ConexionServidor;
-import com.grupo6.security.AESEncryptionStrategy;
 import com.grupo6.security.EncryptionStrategy;
 
 public class Controlador {
@@ -13,10 +12,6 @@ public class Controlador {
   private final EncryptionStrategy encryptionStrategy;
   private IVista vista = null;
   private ModeloVista modelo = new ModeloVista(null, null, new ArrayDeque<>(), null, false);
-
-  public Controlador() {
-    this(new AESEncryptionStrategy());
-  }
 
   public Controlador(EncryptionStrategy encryptionStrategy) {
     this.encryptionStrategy = encryptionStrategy;

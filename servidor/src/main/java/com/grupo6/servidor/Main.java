@@ -4,8 +4,8 @@ import com.grupo6.environment.Environment;
 import com.grupo6.environment.ServerAddress;
 import com.grupo6.persistencia.PersistenciaFactory;
 import com.grupo6.persistencia.PersistenciaFactoryProvider;
-import com.grupo6.security.AESEncryptionStrategy;
 import com.grupo6.security.EncryptionStrategy;
+import com.grupo6.security.EncryptionStrategyProvider;
 
 public class Main {
 
@@ -14,8 +14,14 @@ public class Main {
     final ServerAddress addr = Environment.nodosServidores.get(id);
     final int port = addr.port;
     final PersistenciaFactory persistenciaFactory = PersistenciaFactoryProvider.createFromEnvironment();
-    final EncryptionStrategy encryption = new AESEncryptionStrategy();
-    final Controlador controlador = new Controlador(encryption);
+    EncryptionStrategy encryptionMethod;
+    try {
+      encryptionMethod = EncryptionStrategyProvider.fromEnvironment();
+    } catch (Exception e) {
+      System.err.println(e.getMessage());
+      return;
+    }
+    final Controlador controlador = new Controlador(encryptionMethod);
 
     final Servidor servidor = new Servidor(id, port, persistenciaFactory, controlador);
 
