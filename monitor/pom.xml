@@ -61,6 +61,11 @@
         </dependency>
         <dependency>
             <groupId>com.grupo6</groupId>
+            <artifactId>shared</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.grupo6</groupId>
             <artifactId>modelo</artifactId>
             <version>1.0</version>
         </dependency>

@@ -4,12 +4,11 @@ import javax.swing.SwingUtilities;
 
 public class Main {
   public static void main(String[] args) {
-    Controlador controlador = new Controlador();
     MonitorFrame frame = new MonitorFrame();
     Monitor monitor = new Monitor();
+    Controlador controlador = new Controlador(monitor);
 
     controlador.setVista(frame);
-    monitor.setControlador(controlador);
 
     SwingUtilities.invokeLater(() -> frame.setVisible(true));
 

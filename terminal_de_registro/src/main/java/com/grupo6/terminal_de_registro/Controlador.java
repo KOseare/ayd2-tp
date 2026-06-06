@@ -3,13 +3,19 @@ package com.grupo6.terminal_de_registro;
 import java.util.regex.Pattern;
 
 import com.grupo6.conexion_servidor.ConexionServidor;
+import com.grupo6.security.EncryptionStrategy;
 
 public class Controlador {
   private static final Pattern NUMERIC_PATTERN = Pattern.compile("^\\d+$");
 
   private IVista vista = null;
   private final ConexionServidor conexion = new ConexionServidor();
+  private final EncryptionStrategy encryptionStrategy;
   private ModeloVista modelo = new ModeloVista(null, null);
+
+  public Controlador(EncryptionStrategy encryptionStrategy) {
+    this.encryptionStrategy = encryptionStrategy;
+  }
 
   public void setVista(IVista vista) {
     this.vista = vista;
@@ -23,7 +29,15 @@ public class Controlador {
       vista.actualizar(modelo);
       return;
     }
-    error = enviarPeticionRegistrarse(dni);
+    String encryptedDni;
+    try {
+      encryptedDni = encryptionStrategy.encrypt(dni);
+    } catch (RuntimeException e) {
+      modelo = new ModeloVista(dni, "Error: no se pudo cifrar el DNI.");
+      vista.actualizar(modelo);
+      return;
+    }
+    error = enviarPeticionRegistrarse(encryptedDni);
     if (error != null) {
       modelo = new ModeloVista(dni, error);
       vista.actualizar(modelo);
@@ -56,7 +70,7 @@ public class Controlador {
         return "Error: sin respuesta del servidor.";
       }
 
-      if (response == "ERROR|ACTIVE_NODE_NOT_FOUND") {
+      if ("ERROR|ACTIVE_NODE_NOT_FOUND".equals(response)) {
         return "Error: no se pudo establecer una conexion con el servidor.";
       }
 

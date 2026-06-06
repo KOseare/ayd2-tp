@@ -12,8 +12,10 @@
 
     <modules>
         <module>environment</module>
+        <module>shared</module>
         <module>conexion_servidor</module>
         <module>modelo</module>
+        <module>persistencia</module>
         <module>interfaz_de_operador</module>
         <module>monitor_de_sala</module>
         <module>terminal_de_registro</module>

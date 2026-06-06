@@ -27,6 +27,7 @@ public class PublicMonitorFrame extends JFrame implements IVista {
 
   private static final long serialVersionUID = 1L;
   private static final int HISTORY_LIMIT = 5;
+  private static final int CURRENT_DNI_FONT_SIZE = 56;
 
   private final JLabel currentTurnLabel;
   private final JLabel currentStationLabel;
@@ -50,9 +51,11 @@ public class PublicMonitorFrame extends JFrame implements IVista {
     currentCaption.setForeground(AppUiTheme.TEXT_MUTED);
 
     currentTurnLabel = new JLabel("-", SwingConstants.CENTER);
-    currentTurnLabel.setFont(base.deriveFont(Font.BOLD, 64f));
+    currentTurnLabel.setFont(base.deriveFont(Font.BOLD, CURRENT_DNI_FONT_SIZE));
     currentTurnLabel.setForeground(AppUiTheme.TEXT_HERO_DNI);
     currentTurnLabel.setOpaque(false);
+    currentTurnLabel.setPreferredSize(new Dimension(0, 96));
+    currentTurnLabel.setMinimumSize(new Dimension(0, 96));
 
     currentStationLabel = new JLabel("Puesto ID: -", SwingConstants.CENTER);
     currentStationLabel.setFont(base.deriveFont(Font.BOLD, 24f));
@@ -62,7 +65,9 @@ public class PublicMonitorFrame extends JFrame implements IVista {
     hero.setBackground(AppUiTheme.BG_HERO);
     hero.setBorder(BorderFactory.createCompoundBorder(
         BorderFactory.createLineBorder(AppUiTheme.BORDER_HERO, 2),
-        BorderFactory.createEmptyBorder(20, 24, 28, 24)));
+        BorderFactory.createEmptyBorder(24, 24, 32, 24)));
+    hero.setPreferredSize(new Dimension(0, 230));
+    hero.setMinimumSize(new Dimension(0, 210));
     hero.add(currentCaption, BorderLayout.NORTH);
     hero.add(currentTurnLabel, BorderLayout.CENTER);
     hero.add(currentStationLabel, BorderLayout.SOUTH);

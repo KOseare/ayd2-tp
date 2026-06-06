@@ -73,6 +73,13 @@ public class ConexionServidor {
           while ((response = reader.readLine()) != null) {
             onMessage.onMessage(response);
           }
+          onError.onMessage("ERROR|NETWORK|Connection closed");
+          sleepQuietly(2000);
+          tries++;
+          if (tries >= maxTries) {
+            hallarNodoActivo();
+            tries = 0;
+          }
         } catch (IOException e) {
           onError.onMessage("ERROR|NETWORK|" + e.getMessage());
           sleepQuietly(2000);
