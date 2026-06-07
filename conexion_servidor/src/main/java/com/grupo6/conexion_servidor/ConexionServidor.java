@@ -12,9 +12,7 @@ import com.grupo6.environment.ServerAddress;
 public class ConexionServidor {
   private static final int maxTries = 3;
   private final List<ServerAddress> nodosServidores = Environment.nodosServidores;
-  private Socket socket = null;
-  private BufferedReader reader = null;
-  private int activeId = -1;
+  private volatile int activeId = -1;
 
   private boolean ensureInitialized() {
     if (activeId < 0) {
@@ -51,13 +49,13 @@ public class ConexionServidor {
           sleepQuietly(2500);
           continue;
         }
-        try {
-          final ServerAddress addr = nodosServidores.get(activeId);
-          socket = new Socket(addr.host, addr.port);
-          PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-          reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        final ServerAddress addr = nodosServidores.get(activeId);
+        try (Socket subscriptionSocket = new Socket(addr.host, addr.port);
+            PrintWriter writer = new PrintWriter(subscriptionSocket.getOutputStream(), true);
+            BufferedReader subscriptionReader = new BufferedReader(
+                new InputStreamReader(subscriptionSocket.getInputStream()))) {
           writer.println(subscribeCommand);
-          String subscribedAck = reader.readLine();
+          String subscribedAck = subscriptionReader.readLine();
           if (subscribedAck == null || !subscribedAck.startsWith("OK|SUBSCRIBED")) {
             onError.onMessage("Error de suscripcion");
             sleepQuietly(2000);
@@ -70,7 +68,7 @@ public class ConexionServidor {
           }
           onMessage.onMessage("OK|CONNECTED");
           String response = null;
-          while ((response = reader.readLine()) != null) {
+          while ((response = subscriptionReader.readLine()) != null) {
             onMessage.onMessage(response);
           }
           onError.onMessage("ERROR|NETWORK|Connection closed");
@@ -124,13 +122,12 @@ public class ConexionServidor {
   }
 
   private String sendCommandOneTry(String command) {
-    try {
-      final ServerAddress addr = nodosServidores.get(activeId);
-      socket = new Socket(addr.host, addr.port);
-      PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-      reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    final ServerAddress addr = nodosServidores.get(activeId);
+    try (Socket commandSocket = new Socket(addr.host, addr.port);
+        PrintWriter writer = new PrintWriter(commandSocket.getOutputStream(), true);
+        BufferedReader commandReader = new BufferedReader(new InputStreamReader(commandSocket.getInputStream()))) {
       writer.println(command);
-      String response = reader.readLine();
+      String response = commandReader.readLine();
       if (response == null) {
         return "ERROR|NO_RESPONSE";
       }
