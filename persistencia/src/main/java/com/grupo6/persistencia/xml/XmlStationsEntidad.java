@@ -36,6 +36,8 @@ public class XmlStationsEntidad implements StationsEntidad {
 
   @Override
   public Optional<String> load() throws IOException {
+    return Optional.empty();
+    /*
     final Document doc = disk.readRoot(filePath);
     final Element stations = (Element) doc.getElementsByTagName("stations").item(0);
     if (stations == null) {
@@ -53,5 +55,6 @@ public class XmlStationsEntidad implements StationsEntidad {
       block.append(items.item(i).getTextContent());
     }
     return Optional.of(block.toString());
+    */
   }
 }

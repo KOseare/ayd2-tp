@@ -32,6 +32,8 @@ public class JsonStationsEntidad implements StationsEntidad {
 
   @Override
   public Optional<String> load() throws IOException {
+    return Optional.empty();
+    /*
     final JsonObject root = disk.readRoot(filePath);
     if (!root.has("stations") || !root.get("stations").isJsonArray()) {
       return Optional.empty();
@@ -48,5 +50,6 @@ public class JsonStationsEntidad implements StationsEntidad {
       block.append(stations.get(i).getAsString());
     }
     return Optional.of(block.toString());
+    */
   }
 }

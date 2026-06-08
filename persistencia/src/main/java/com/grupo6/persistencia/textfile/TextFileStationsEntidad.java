@@ -21,6 +21,9 @@ public class TextFileStationsEntidad implements StationsEntidad {
 
   @Override
   public Optional<String> load() throws IOException {
+    return Optional.empty();
+    /*
     return disk.readContent(filePath);
+    */
   }
 }
